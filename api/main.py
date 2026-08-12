@@ -20,9 +20,8 @@ import logging
 import time
 from collections import Counter
 from contextlib import asynccontextmanager
-from typing import Any
-
 from pathlib import Path
+from typing import Any
 
 import boto3
 from fastapi import FastAPI, HTTPException
