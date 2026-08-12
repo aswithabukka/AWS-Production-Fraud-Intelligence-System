@@ -1,0 +1,859 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>fraud·lake — ops console</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>▮</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=VT323&family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+/* ============================================================================
+   FRAUD·LAKE OPS CONSOLE
+   Aesthetic: amber-phosphor CRT terminal. One screen, dense, operational.
+   ========================================================================== */
+
+:root {
+  --bg:        #0b0a08;
+  --bg-raise:  #121008;
+  --bg-panel:  #16130a;
+  --line:      #2e2718;
+  --line-hot:  #4a3d1f;
+  --amber:     #ffb454;
+  --amber-hi:  #ffd28f;
+  --amber-dim: #9c7c45;
+  --amber-ghost:#5c4a28;
+  --red:       #ff5c57;
+  --green:     #5af78e;
+  --cyan:      #6be5e0;
+  --text:      #e8dcc3;
+  --text-dim:  #a89877;
+  --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --display: "VT323", var(--mono);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body { height: 100%; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.55;
+  overflow: hidden;
+}
+
+/* ---- CRT atmosphere: scanlines + vignette + slow phosphor flicker -------- */
+body::before {
+  content: "";
+  position: fixed; inset: 0;
+  pointer-events: none;
+  z-index: 999;
+  background:
+    repeating-linear-gradient(0deg,
+      rgba(0,0,0,0)    0px,
+      rgba(0,0,0,0)    2px,
+      rgba(0,0,0,.13)  3px),
+    radial-gradient(ellipse 120% 90% at 50% 45%,
+      rgba(0,0,0,0) 55%, rgba(0,0,0,.42) 100%);
+}
+body::after {
+  content: "";
+  position: fixed; inset: 0;
+  pointer-events: none;
+  z-index: 998;
+  background: rgba(255,180,84,.022);
+  animation: flicker 7s infinite;
+}
+@keyframes flicker {
+  0%, 100% { opacity: 1; }
+  92%      { opacity: 1; }
+  93%      { opacity: .55; }
+  94%      { opacity: 1; }
+  97%      { opacity: .8; }
+  98%      { opacity: 1; }
+}
+
+::selection { background: var(--amber); color: var(--bg); }
+
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--line-hot); }
+::-webkit-scrollbar-thumb:hover { background: var(--amber-ghost); }
+
+/* ================================================================ layout */
+
+.shell {
+  display: grid;
+  grid-template-rows: auto auto 1fr;
+  height: 100vh;
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 0 18px;
+}
+
+/* ---------------------------------------------------------------- header */
+
+header {
+  display: flex;
+  align-items: baseline;
+  gap: 20px;
+  padding: 14px 2px 10px;
+  border-bottom: 1px solid var(--line);
+}
+
+.wordmark {
+  font-family: var(--display);
+  font-size: 38px;
+  letter-spacing: 2px;
+  color: var(--amber);
+  text-shadow: 0 0 18px rgba(255,180,84,.45), 0 0 3px rgba(255,180,84,.9);
+  user-select: none;
+}
+.wordmark .dot { color: var(--red); }
+
+.tagline {
+  color: var(--text-dim);
+  font-size: 11px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+
+.header-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  font-size: 11px;
+}
+
+.led-wrap { display: flex; align-items: center; gap: 7px; cursor: default; position: relative; }
+.led {
+  width: 9px; height: 9px;
+  border-radius: 50%;
+  background: var(--amber-ghost);
+  transition: background .3s, box-shadow .3s;
+}
+.led.ok   { background: var(--green); box-shadow: 0 0 8px var(--green), 0 0 2px var(--green); animation: pulse 2.4s infinite; }
+.led.warn { background: var(--amber); box-shadow: 0 0 8px var(--amber); }
+.led.err  { background: var(--red);   box-shadow: 0 0 8px var(--red); }
+@keyframes pulse { 50% { opacity: .55; } }
+
+.led-detail {
+  display: none;
+  position: absolute;
+  top: 22px; right: 0;
+  background: var(--bg-panel);
+  border: 1px solid var(--line-hot);
+  padding: 10px 14px;
+  white-space: pre;
+  z-index: 50;
+  box-shadow: 0 8px 30px rgba(0,0,0,.6);
+}
+.led-wrap:hover .led-detail { display: block; }
+
+.clock { color: var(--amber-dim); font-variant-numeric: tabular-nums; }
+
+/* ---------------------------------------------------------------- ticker */
+
+.ticker {
+  display: flex;
+  gap: 26px;
+  padding: 7px 2px;
+  border-bottom: 1px solid var(--line);
+  font-size: 11px;
+  color: var(--text-dim);
+  overflow-x: auto;
+  white-space: nowrap;
+}
+.ticker b { color: var(--amber); font-weight: 500; }
+.ticker .up { color: var(--green); }
+.ticker .down { color: var(--red); }
+
+/* ------------------------------------------------------------------ main */
+
+main {
+  display: grid;
+  grid-template-columns: 1fr 330px;
+  gap: 18px;
+  min-height: 0;
+  padding: 14px 0 16px;
+}
+
+/* ------------------------------------------------------------------ chat */
+
+.chat {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, var(--bg-raise), var(--bg));
+}
+
+.panel-title {
+  font-size: 10px;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  color: var(--amber-dim);
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  justify-content: space-between;
+  user-select: none;
+}
+.panel-title .hint { color: var(--amber-ghost); letter-spacing: 0; text-transform: none; }
+
+.thread {
+  flex: 1;
+  overflow-y: auto;
+  padding: 18px 16px 8px;
+  scroll-behavior: smooth;
+}
+
+.msg { margin-bottom: 22px; animation: rise .25s ease-out; }
+@keyframes rise { from { opacity: 0; transform: translateY(6px); } }
+
+.msg .who {
+  font-size: 10px;
+  letter-spacing: .15em;
+  text-transform: uppercase;
+  margin-bottom: 5px;
+}
+.msg.user .who   { color: var(--cyan); }
+.msg.agent .who  { color: var(--amber); }
+.msg.system .who { color: var(--red); }
+
+.msg .body { white-space: pre-wrap; word-break: break-word; }
+.msg.user .body { color: var(--text-dim); }
+.msg.agent .body b { color: var(--amber-hi); font-weight: 600; }
+
+.msg.system .body { color: var(--red); opacity: .9; }
+
+/* progress line while the graph runs */
+.progress {
+  color: var(--amber-dim);
+  font-size: 12px;
+}
+.progress .node { color: var(--amber); }
+.progress .cursor {
+  display: inline-block;
+  width: 8px; height: 14px;
+  background: var(--amber);
+  vertical-align: text-bottom;
+  animation: blink 1s steps(1) infinite;
+  margin-left: 2px;
+}
+@keyframes blink { 50% { opacity: 0; } }
+
+/* ---- expandable evidence panels under an answer ---- */
+.evidence { margin-top: 10px; display: flex; flex-direction: column; gap: 4px; }
+
+details.ev {
+  border: 1px solid var(--line);
+  background: var(--bg-panel);
+}
+details.ev summary {
+  cursor: pointer;
+  list-style: none;
+  padding: 5px 12px;
+  font-size: 11px;
+  color: var(--amber-dim);
+  letter-spacing: .08em;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  transition: color .15s, background .15s;
+}
+details.ev summary::-webkit-details-marker { display: none; }
+details.ev summary::before { content: "▸"; color: var(--amber-ghost); transition: transform .15s; }
+details.ev[open] summary::before { transform: rotate(90deg); }
+details.ev summary:hover { color: var(--amber); background: rgba(255,180,84,.04); }
+details.ev summary .badge {
+  margin-left: auto;
+  font-size: 10px;
+  color: var(--amber-ghost);
+}
+details.ev .ev-body {
+  border-top: 1px solid var(--line);
+  padding: 10px 12px;
+  overflow-x: auto;
+}
+
+pre.sql {
+  color: var(--amber-hi);
+  font-size: 12px;
+  line-height: 1.6;
+  white-space: pre;
+}
+pre.sql .kw { color: var(--cyan); }
+pre.sql .num { color: var(--green); }
+pre.sql .str { color: var(--red); }
+
+.cite { padding: 8px 0; border-bottom: 1px dashed var(--line); font-size: 12px; }
+.cite:last-child { border-bottom: none; }
+.cite .src { color: var(--cyan); font-size: 11px; }
+.cite .score { color: var(--amber-ghost); }
+.cite .txt { color: var(--text-dim); margin-top: 3px; }
+
+.kv { display: grid; grid-template-columns: auto 1fr; gap: 2px 18px; font-size: 11px; }
+.kv dt { color: var(--amber-ghost); }
+.kv dd { color: var(--text-dim); }
+
+.trace-row { font-size: 11px; color: var(--text-dim); padding: 2px 0; }
+.trace-row .n { color: var(--amber-dim); display: inline-block; min-width: 100px; }
+
+/* ---- meta strip under each answer ---- */
+.meta {
+  margin-top: 8px;
+  font-size: 10.5px;
+  color: var(--amber-ghost);
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.meta b { color: var(--amber-dim); font-weight: 500; }
+
+/* --------------------------------------------------------------- composer */
+
+.composer {
+  border-top: 1px solid var(--line);
+  padding: 10px 14px 12px;
+}
+
+.chips { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+.chip {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--amber-dim);
+  background: none;
+  border: 1px solid var(--line);
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: all .15s;
+}
+.chip:hover {
+  color: var(--amber-hi);
+  border-color: var(--amber-dim);
+  box-shadow: 0 0 12px rgba(255,180,84,.15), inset 0 0 12px rgba(255,180,84,.05);
+}
+
+.inputrow { display: flex; align-items: center; gap: 10px; }
+.prompt-char {
+  color: var(--amber);
+  font-weight: 600;
+  text-shadow: 0 0 8px rgba(255,180,84,.6);
+  user-select: none;
+}
+#q {
+  flex: 1;
+  background: none;
+  border: none;
+  outline: none;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 14px;
+  caret-color: var(--amber);
+}
+#q::placeholder { color: var(--amber-ghost); }
+
+#send {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: .1em;
+  background: var(--amber);
+  color: var(--bg);
+  border: none;
+  padding: 6px 16px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all .15s;
+}
+#send:hover { background: var(--amber-hi); box-shadow: 0 0 16px rgba(255,180,84,.4); }
+#send:disabled { background: var(--amber-ghost); cursor: wait; box-shadow: none; }
+
+/* ------------------------------------------------------------- right rail */
+
+.rail {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.railbox {
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, var(--bg-raise), var(--bg));
+  flex-shrink: 0;
+}
+.railbox .inner { padding: 12px 14px; }
+
+#sqlbox {
+  width: 100%;
+  min-height: 96px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  color: var(--amber-hi);
+  font-family: var(--mono);
+  font-size: 12px;
+  padding: 8px 10px;
+  resize: vertical;
+  outline: none;
+}
+#sqlbox:focus { border-color: var(--amber-ghost); }
+
+.attack-row { display: flex; gap: 6px; flex-wrap: wrap; margin: 8px 0; }
+.attack {
+  font-family: var(--mono);
+  font-size: 10px;
+  background: none;
+  border: 1px solid var(--line);
+  color: var(--red);
+  opacity: .75;
+  padding: 3px 8px;
+  cursor: pointer;
+  transition: all .15s;
+}
+.attack:hover { opacity: 1; border-color: var(--red); box-shadow: 0 0 10px rgba(255,92,87,.25); }
+.attack.legit { color: var(--green); }
+.attack.legit:hover { border-color: var(--green); box-shadow: 0 0 10px rgba(90,247,142,.25); }
+
+#checkbtn {
+  width: 100%;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: .12em;
+  background: none;
+  border: 1px solid var(--amber-dim);
+  color: var(--amber);
+  padding: 7px 0;
+  cursor: pointer;
+  transition: all .15s;
+}
+#checkbtn:hover { background: rgba(255,180,84,.08); box-shadow: 0 0 14px rgba(255,180,84,.2); }
+
+#verdict { margin-top: 10px; font-size: 11.5px; display: none; }
+#verdict.show { display: block; animation: rise .2s ease-out; }
+#verdict .v-ok  { color: var(--green); }
+#verdict .v-bad { color: var(--red); }
+#verdict pre {
+  margin-top: 6px;
+  color: var(--amber-hi);
+  font-size: 11px;
+  overflow-x: auto;
+  border-left: 2px solid var(--line-hot);
+  padding-left: 10px;
+  white-space: pre;
+}
+#verdict .why { color: var(--text-dim); margin-top: 4px; }
+
+.sys-kv { display: grid; grid-template-columns: auto 1fr; gap: 3px 14px; font-size: 11px; }
+.sys-kv dt { color: var(--amber-ghost); }
+.sys-kv dd { color: var(--text-dim); text-align: right; font-variant-numeric: tabular-nums; }
+.sys-kv dd.on { color: var(--green); }
+.sys-kv dd.off { color: var(--amber-ghost); }
+
+.footnote {
+  font-size: 10px;
+  color: var(--amber-ghost);
+  padding: 0 2px;
+  line-height: 1.7;
+}
+.footnote code { color: var(--amber-dim); }
+
+@media (max-width: 900px) {
+  main { grid-template-columns: 1fr; }
+  .rail { display: none; }
+  body { overflow: auto; }
+}
+</style>
+</head>
+<body>
+
+<div class="shell">
+
+  <header>
+    <div class="wordmark">FRAUD<span class="dot">·</span>LAKE</div>
+    <div class="tagline">agentic analytics console</div>
+    <div class="header-right">
+      <span class="clock" id="clock">--:--:--</span>
+      <div class="led-wrap">
+        <div class="led" id="led"></div>
+        <span id="ledlabel" style="color:var(--text-dim)">probing…</span>
+        <div class="led-detail" id="leddetail">waiting for /health…</div>
+      </div>
+    </div>
+  </header>
+
+  <div class="ticker" id="ticker">
+    <span>KINESIS <b>on-demand</b></span>
+    <span>ATHENA CAP <b>1 GB/query</b></span>
+    <span>ICEBERG <b>bronze·silver·gold</b></span>
+    <span>MAX_ITERATIONS <b>5</b></span>
+    <span>VALIDATOR <b class="up">SELECT-only</b></span>
+    <span>VECTOR STORE <b>S3 Vectors</b></span>
+    <span>NAT GATEWAYS <b class="up">0</b></span>
+    <span>IDLE COMPUTE <b class="up">$0</b></span>
+  </div>
+
+  <main>
+
+    <!-- ============================================== chat column -->
+    <section class="chat">
+      <div class="panel-title">
+        <span>▮ interrogation thread</span>
+        <span class="hint">answers arrive with the SQL that produced them</span>
+      </div>
+
+      <div class="thread" id="thread">
+        <div class="msg agent">
+          <div class="who">fraud·lake</div>
+          <div class="body">Console ready. Ask about fraud metrics, policy, or pipeline health — or try the SQL validator on the right against the read-only boundary.
+
+Three kinds of question I can answer:
+  <b>data</b>    → “compare fraud rate by MCC, last 30 days vs prior 30”
+  <b>policy</b>  → “what do the docs say about chargeback thresholds?”
+  <b>ops</b>     → “did last night’s pipeline run succeed?”</div>
+        </div>
+      </div>
+
+      <div class="composer">
+        <div class="chips" id="chips">
+          <button class="chip">Compare fraud rate by MCC for the last 30 days versus the prior 30</button>
+          <button class="chip">Which merchants have the highest fraud loss?</button>
+          <button class="chip">What does policy say about chargeback thresholds?</button>
+          <button class="chip">Did the pipeline run in the last 3 hours?</button>
+        </div>
+        <div class="inputrow">
+          <span class="prompt-char">❯</span>
+          <input id="q" placeholder="ask the lakehouse…" autocomplete="off" spellcheck="false">
+          <button id="send">ASK</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================== right rail -->
+    <aside class="rail">
+
+      <div class="railbox">
+        <div class="panel-title"><span>▮ sql validator — live fire</span></div>
+        <div class="inner">
+          <textarea id="sqlbox" spellcheck="false">SELECT dt, mcc, fraud_rate_pct
+FROM fraud_gold.fraud_metrics_daily
+WHERE dt >= current_date - INTERVAL '30' DAY</textarea>
+          <div class="attack-row">
+            <button class="attack legit" data-sql="SELECT mcc, sum(fraud_loss_amount_usd) AS loss FROM fraud_gold.fraud_metrics_daily GROUP BY mcc ORDER BY loss DESC">legit aggregate</button>
+            <button class="attack" data-sql="SELECT dt FROM fraud_gold.fraud_metrics_daily; DROP TABLE fraud_gold.fraud_metrics_daily">stacked DROP</button>
+            <button class="attack" data-sql="SELECT mcc FROM fraud_gold.fraud_metrics_daily UNION ALL SELECT customer_id FROM fraud_silver.transactions">UNION → silver</button>
+            <button class="attack" data-sql="WITH fraud_metrics_daily AS (SELECT customer_id FROM fraud_silver.transactions) SELECT * FROM fraud_metrics_daily">CTE laundering</button>
+            <button class="attack" data-sql="DR/**/OP TABLE fraud_gold.merchant_risk">comment-split DROP</button>
+          </div>
+          <button id="checkbtn">RUN AGAINST THE BOUNDARY</button>
+          <div id="verdict"></div>
+        </div>
+      </div>
+
+      <div class="railbox">
+        <div class="panel-title"><span>▮ system</span></div>
+        <div class="inner">
+          <dl class="sys-kv" id="syskv">
+            <dt>api</dt><dd id="s-api">…</dd>
+            <dt>athena workgroup</dt><dd id="s-wg">…</dd>
+            <dt>knowledge base</dt><dd id="s-kb">…</dd>
+            <dt>guardrail</dt><dd id="s-gr">…</dd>
+            <dt>state machine</dt><dd id="s-sm">…</dd>
+            <dt>questions asked</dt><dd id="s-count">0</dd>
+            <dt>tokens spent</dt><dd id="s-tokens">0</dd>
+          </dl>
+        </div>
+      </div>
+
+      <div class="footnote">
+        The validator and health endpoints run fully offline. <code>/ask</code> needs the
+        AWS stack applied (<code>enable_agent_layer=true</code>) and Bedrock model access —
+        until then it will report what’s missing rather than invent an answer.
+      </div>
+
+    </aside>
+
+  </main>
+</div>
+
+<script>
+/* =========================================================================
+   fraud·lake console — no framework, no build step.
+   ========================================================================= */
+
+const $ = (id) => document.getElementById(id);
+const thread = $("thread");
+
+let questionCount = 0;
+let tokensSpent = 0;
+
+/* ------------------------------------------------------------ utilities */
+
+const esc = (s) => String(s ?? "")
+  .replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;");
+
+function fmtBytes(n) {
+  n = Number(n) || 0;
+  if (n < 1024) return n + " B";
+  if (n < 1048576) return (n/1024).toFixed(1) + " KB";
+  return (n/1048576).toFixed(2) + " MB";
+}
+
+function highlightSql(sql) {
+  let out = esc(sql);
+  out = out.replace(/('[^']*')/g, '<span class="str">$1</span>');
+  out = out.replace(/\b(\d+(?:\.\d+)?)\b/g, '<span class="num">$1</span>');
+  out = out.replace(/\b(SELECT|FROM|WHERE|GROUP BY|ORDER BY|LIMIT|JOIN|LEFT|RIGHT|ON|AS|AND|OR|WITH|UNION|ALL|SUM|COUNT|AVG|MIN|MAX|ROUND|CASE|WHEN|THEN|ELSE|END|INTERVAL|DATE|CURRENT_DATE|DESC|ASC|HAVING|DISTINCT|BETWEEN|IN|NOT|NULL|IS)\b/gi,
+    (m) => '<span class="kw">' + m.toUpperCase() + '</span>');
+  return out;
+}
+
+function addMsg(cls, who, bodyHtml) {
+  const el = document.createElement("div");
+  el.className = "msg " + cls;
+  el.innerHTML = `<div class="who">${who}</div><div class="body">${bodyHtml}</div>`;
+  thread.appendChild(el);
+  thread.scrollTop = thread.scrollHeight;
+  return el;
+}
+
+/* ------------------------------------------------------------ the clock */
+
+setInterval(() => {
+  $("clock").textContent = new Date().toISOString().slice(11,19) + " UTC";
+}, 1000);
+
+/* --------------------------------------------------------------- health */
+
+async function probeHealth() {
+  const led = $("led"), label = $("ledlabel"), detail = $("leddetail");
+  try {
+    const r = await fetch("/health");
+    const h = await r.json();
+    led.className = "led " + (h.status === "ok" ? "ok" : "warn");
+    label.textContent = h.status === "ok" ? "operational" : "degraded";
+    detail.textContent = Object.entries(h.checks)
+      .map(([k,v]) => k.padEnd(18) + v).join("\n");
+    $("s-api").textContent = "v" + h.version;         $("s-api").className = "on";
+    setCheck("s-wg", h.checks.athena_workgroup, "configured");
+    setCheck("s-kb", h.checks.knowledge_base, "configured");
+    setCheck("s-gr", h.checks.guardrail, "enabled");
+    setCheck("s-sm", h.checks.state_machine, "configured");
+  } catch {
+    led.className = "led err";
+    label.textContent = "unreachable";
+    detail.textContent = "the FastAPI process is not responding";
+    $("s-api").textContent = "down"; $("s-api").className = "off";
+  }
+}
+function setCheck(id, value, goodValue) {
+  const el = $(id);
+  el.textContent = value || "—";
+  el.className = value === goodValue ? "on" : "off";
+}
+probeHealth();
+setInterval(probeHealth, 15000);
+
+/* ------------------------------------------------------------ ask flow */
+
+$("chips").addEventListener("click", (e) => {
+  if (e.target.classList.contains("chip")) {
+    $("q").value = e.target.textContent;
+    $("q").focus();
+  }
+});
+
+$("q").addEventListener("keydown", (e) => { if (e.key === "Enter") ask(); });
+$("send").addEventListener("click", ask);
+
+async function ask() {
+  const q = $("q").value.trim();
+  if (!q || $("send").disabled) return;
+  $("q").value = "";
+  $("send").disabled = true;
+
+  addMsg("user", "you", esc(q));
+  const prog = addMsg("agent", "fraud·lake",
+    `<span class="progress"><span class="node">route_query</span> — deciding which tool this needs<span class="cursor"></span></span>`);
+
+  try {
+    const answer = await askStreaming(q, prog).catch(() => askBlocking(q));
+    renderAnswer(prog, q, answer);
+  } catch (err) {
+    prog.querySelector(".body").innerHTML =
+      `<span style="color:var(--red)">✗ ${esc(err.message)}</span>\n` +
+      `<span style="color:var(--text-dim)">If the AWS stack isn’t applied yet this is expected — ` +
+      `the validator panel on the right works fully offline.</span>`;
+  } finally {
+    $("send").disabled = false;
+    $("q").focus();
+  }
+}
+
+/* Try SSE first — it narrates the graph while it runs. */
+async function askStreaming(question, prog) {
+  const res = await fetch("/ask/stream", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ question }),
+  });
+  if (!res.ok || !res.body) throw new Error("stream unavailable");
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "", answer = null;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+
+    let sep;
+    while ((sep = buffer.indexOf("\n\n")) !== -1) {
+      const frame = buffer.slice(0, sep); buffer = buffer.slice(sep + 2);
+      const ev = /event: (.+)/.exec(frame)?.[1];
+      const data = /data: (.+)/s.exec(frame)?.[1];
+      if (!ev || !data) continue;
+      const payload = JSON.parse(data);
+
+      if (ev === "progress") {
+        prog.querySelector(".body").innerHTML =
+          `<span class="progress"><span class="node">${esc(payload.node)}</span> — ${esc(payload.detail)}<span class="cursor"></span></span>`;
+      } else if (ev === "answer") {
+        answer = payload;
+      } else if (ev === "error") {
+        throw new Error(payload.error);
+      }
+    }
+  }
+  if (!answer) throw new Error("stream ended without an answer");
+  return answer;
+}
+
+async function askBlocking(question) {
+  const res = await fetch("/ask", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ question }),
+  });
+  if (!res.ok) {
+    const detail = (await res.json().catch(() => ({})))?.detail;
+    throw new Error(detail || `HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
+function renderAnswer(el, question, a) {
+  questionCount++;
+  $("s-count").textContent = questionCount;
+  const usage = a.token_usage || {};
+  tokensSpent += usage.total_tokens || 0;
+  $("s-tokens").textContent = tokensSpent.toLocaleString();
+
+  const body = el.querySelector(".body");
+  let html = esc(a.answer || "(no answer)")
+    .replace(/\*\*(.+?)\*\*/g, "<b>$1</b>");
+
+  /* evidence panels */
+  const panels = [];
+
+  const sqls = a.sql_executed || [];
+  if (sqls.length) {
+    panels.push(`
+      <details class="ev" open>
+        <summary>sql that ran <span class="badge">${sqls.length} quer${sqls.length>1?"ies":"y"}</span></summary>
+        <div class="ev-body">${sqls.map(s => `<pre class="sql">${highlightSql(s)}</pre>`).join("<hr style='border:none;border-top:1px dashed var(--line);margin:8px 0'>")}</div>
+      </details>`);
+  }
+
+  const cites = a.citations || [];
+  if (cites.length) {
+    panels.push(`
+      <details class="ev">
+        <summary>citations <span class="badge">${cites.length} passages</span></summary>
+        <div class="ev-body">${cites.map((c,i) => `
+          <div class="cite">
+            <span class="src">[${i+1}] ${esc(c.document)}</span>
+            <span class="score">relevance ${c.score}</span>
+            <div class="txt">${esc((c.text||"").slice(0,400))}${(c.text||"").length>400?"…":""}</div>
+          </div>`).join("")}</div>
+      </details>`);
+  }
+
+  const trace = a.trace || [];
+  if (trace.length) {
+    panels.push(`
+      <details class="ev">
+        <summary>execution trace <span class="badge">${trace.length} steps</span></summary>
+        <div class="ev-body">${trace.map(t => `
+          <div class="trace-row"><span class="n">${esc(t.node)}</span>${
+            esc(t.decision ? "→ " + t.decision + (t.reasoning ? "  (" + t.reasoning + ")" : "")
+              : t.tool ? "ran " + t.tool
+              : t.note || "")
+          }${t.latency_ms ? ` <span style="color:var(--amber-ghost)">${t.latency_ms}ms</span>` : ""}</div>`).join("")}</div>
+      </details>`);
+  }
+
+  /* meta strip */
+  const meta = [];
+  if (a.tools_used?.length) meta.push(`tools <b>${a.tools_used.join(", ")}</b>`);
+  if (a.iterations != null) meta.push(`iterations <b>${a.iterations}/5</b>`);
+  if (a.latency_ms) meta.push(`latency <b>${(a.latency_ms/1000).toFixed(1)}s</b>`);
+  if (usage.total_tokens) meta.push(`tokens <b>${usage.total_tokens.toLocaleString()}</b> (${usage.input_tokens} in / ${usage.output_tokens} out)`);
+  if (a.stopped_reason) meta.push(`<span style="color:var(--red)">stopped: ${esc(a.stopped_reason)}</span>`);
+
+  body.innerHTML = html
+    + (panels.length ? `<div class="evidence">${panels.join("")}</div>` : "")
+    + (meta.length ? `<div class="meta">${meta.join("&ensp;·&ensp;")}</div>` : "");
+  thread.scrollTop = thread.scrollHeight;
+}
+
+/* ------------------------------------------------------- sql validator */
+
+document.querySelectorAll(".attack").forEach(btn => {
+  btn.addEventListener("click", () => {
+    $("sqlbox").value = btn.dataset.sql;
+    checkSql();
+  });
+});
+
+$("checkbtn").addEventListener("click", checkSql);
+
+async function checkSql() {
+  const sql = $("sqlbox").value.trim();
+  const v = $("verdict");
+  if (!sql) return;
+  v.className = "show";
+  v.innerHTML = `<span style="color:var(--amber-dim)">parsing…</span>`;
+
+  try {
+    const res = await fetch("/sql/check", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ sql }),
+    });
+    const r = await res.json();
+
+    if (r.status === "ok") {
+      v.innerHTML = `
+        <div class="v-ok">✓ ACCEPTED${r.limit_was_injected ? " — LIMIT " + r.limit_applied + " injected" : ""}</div>
+        <div class="why">reads: ${r.tables.join(", ")}</div>
+        <pre>${highlightSql(r.sql)}</pre>`;
+    } else {
+      v.innerHTML = `
+        <div class="v-bad">✗ REJECTED</div>
+        <div class="why">${esc(r.reason)}</div>`;
+    }
+  } catch (e) {
+    v.innerHTML = `<div class="v-bad">✗ api unreachable — ${esc(e.message)}</div>`;
+  }
+}
+</script>
+</body>
+</html>

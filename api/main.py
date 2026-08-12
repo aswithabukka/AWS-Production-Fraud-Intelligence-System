@@ -22,9 +22,11 @@ from collections import Counter
 from contextlib import asynccontextmanager
 from typing import Any
 
+from pathlib import Path
+
 import boto3
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse
 
 from agents.bedrock import BedrockClient
 from agents.config import get_config
@@ -66,6 +68,19 @@ app = FastAPI(
     version=VERSION,
     lifespan=lifespan,
 )
+
+
+_CONSOLE = Path(__file__).parent / "static" / "index.html"
+
+
+@app.get("/", include_in_schema=False)
+def console() -> FileResponse:
+    """The ops console — a single self-contained HTML file, no build step.
+
+    Served by the API itself so the UI ships inside the same container: one image, one
+    port, nothing extra to deploy or keep in sync.
+    """
+    return FileResponse(_CONSOLE, media_type="text/html")
 
 
 @app.get("/health", response_model=HealthResponse)

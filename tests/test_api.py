@@ -113,3 +113,13 @@ def test_metrics_endpoint_counts_activity(client):
     client.post("/sql/check", json={"sql": "DROP TABLE fraud_gold.merchant_risk"})
     counters = client.get("/metrics").json()["counters"]
     assert counters.get("sql_rejected", 0) >= 1
+
+
+def test_root_serves_the_console(client):
+    response = client.get("/")
+    assert response.status_code == 200
+    assert "text/html" in response.headers["content-type"]
+    assert "FRAUD" in response.text
+    # The console must reference the real endpoints it drives.
+    for endpoint in ("/ask", "/sql/check", "/health"):
+        assert endpoint in response.text
