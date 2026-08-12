@@ -1,0 +1,386 @@
+{
+  "Comment": "fraud-lake medallion pipeline. Bronze -> quality gate -> silver -> quality gate -> gold -> knowledge-base refresh. A failing gate writes a failure report, notifies SNS, and skips every downstream stage so the last known-good silver and gold data stays intact.",
+  "StartAt": "ValidateInput",
+  "TimeoutSeconds": 3600,
+  "States": {
+    "ValidateInput": {
+      "Type": "Pass",
+      "Comment": "Normalise the input. Both triggers (hourly schedule and S3 arrival) must produce the same shape, so downstream states never branch on where they came from.",
+      "Parameters": {
+        "trigger.$": "$.trigger",
+        "process_date.$": "$.process_date",
+        "execution_arn.$": "$$.Execution.Id",
+        "started_at.$": "$$.Execution.StartTime"
+      },
+      "Next": "RunBronzeJob"
+    },
+
+    "RunBronzeJob": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::glue:startJobRun.sync",
+      "Comment": "Raw JSON -> typed, deduplicated Iceberg. Malformed records go to quarantine and never enter bronze.",
+      "Parameters": {
+        "JobName": "${bronze_job_name}",
+        "Arguments": {
+          "--process_date.$": "$.process_date"
+        }
+      },
+      "ResultPath": null,
+      "Retry": [
+        {
+          "Comment": "Glue throttles concurrent runs and occasionally fails to allocate capacity. Both are transient; exponential backoff clears them.",
+          "ErrorEquals": [
+            "Glue.ConcurrentRunsExceededException",
+            "Glue.ResourceNumberLimitExceededException",
+            "Glue.InternalServiceException"
+          ],
+          "IntervalSeconds": 60,
+          "MaxAttempts": 3,
+          "BackoffRate": 2.0
+        },
+        {
+          "Comment": "One retry for a genuine task failure. More than that and it is a code bug, not a blip — retrying a bug just bills for it twice.",
+          "ErrorEquals": ["States.TaskFailed"],
+          "IntervalSeconds": 30,
+          "MaxAttempts": 1,
+          "BackoffRate": 2.0
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "ResultPath": "$.error",
+          "Next": "RecordBronzeFailure"
+        }
+      ],
+      "Next": "RunBronzeQualityGate"
+    },
+
+    "RunBronzeQualityGate": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::glue:startJobRun.sync",
+      "Comment": "Evaluates the bronze DQDL ruleset. Writes a verdict to S3; it does NOT fail the task when the data is bad, because a gate that catches bad data is working correctly.",
+      "Parameters": {
+        "JobName": "${quality_job_name}",
+        "Arguments": {
+          "--layer": "bronze",
+          "--target_table": "${bronze_table}"
+        }
+      },
+      "ResultPath": null,
+      "Retry": [
+        {
+          "ErrorEquals": ["Glue.ConcurrentRunsExceededException", "Glue.InternalServiceException"],
+          "IntervalSeconds": 60,
+          "MaxAttempts": 3,
+          "BackoffRate": 2.0
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "ResultPath": "$.error",
+          "Next": "RecordBronzeFailure"
+        }
+      ],
+      "Next": "ReadBronzeVerdict"
+    },
+
+    "ReadBronzeVerdict": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${quality_gate_function_arn}",
+        "Payload": {
+          "layer": "bronze"
+        }
+      },
+      "ResultSelector": {
+        "passed.$": "$.Payload.passed",
+        "pass_rate_pct.$": "$.Payload.pass_rate_pct",
+        "failed_count.$": "$.Payload.failed_count",
+        "failed_rules.$": "$.Payload.failed_rules",
+        "report_uri.$": "$.Payload.report_uri",
+        "layer.$": "$.Payload.layer"
+      },
+      "ResultPath": "$.quality",
+      "Retry": [
+        {
+          "ErrorEquals": ["Lambda.ServiceException", "Lambda.TooManyRequestsException", "Lambda.SdkClientException"],
+          "IntervalSeconds": 5,
+          "MaxAttempts": 3,
+          "BackoffRate": 2.0
+        }
+      ],
+      "Next": "BronzeQualityChoice"
+    },
+
+    "BronzeQualityChoice": {
+      "Type": "Choice",
+      "Comment": "The visible fork. On failure the whole downstream path is skipped — silver and gold keep serving their last good snapshot rather than being overwritten with data we know is wrong.",
+      "Choices": [
+        {
+          "Variable": "$.quality.passed",
+          "BooleanEquals": true,
+          "Next": "RunSilverJob"
+        }
+      ],
+      "Default": "MarkQualityFailure"
+    },
+
+    "RunSilverJob": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::glue:startJobRun.sync",
+      "Comment": "Fraud features: per-customer velocity, amount z-score, merchant risk, geo distance and implied speed, device change.",
+      "Parameters": {
+        "JobName": "${silver_job_name}"
+      },
+      "ResultPath": null,
+      "Retry": [
+        {
+          "ErrorEquals": ["Glue.ConcurrentRunsExceededException", "Glue.InternalServiceException"],
+          "IntervalSeconds": 60,
+          "MaxAttempts": 3,
+          "BackoffRate": 2.0
+        },
+        {
+          "ErrorEquals": ["States.TaskFailed"],
+          "IntervalSeconds": 30,
+          "MaxAttempts": 1,
+          "BackoffRate": 2.0
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "ResultPath": "$.error",
+          "Next": "RecordSilverFailure"
+        }
+      ],
+      "Next": "RunSilverQualityGate"
+    },
+
+    "RunSilverQualityGate": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::glue:startJobRun.sync",
+      "Comment": "Silver rules check that the features computed, not just that the rows exist. A feature column that is 100% NULL passes every bronze rule and is still broken.",
+      "Parameters": {
+        "JobName": "${quality_job_name}",
+        "Arguments": {
+          "--layer": "silver",
+          "--target_table": "${silver_table}"
+        }
+      },
+      "ResultPath": null,
+      "Retry": [
+        {
+          "ErrorEquals": ["Glue.ConcurrentRunsExceededException", "Glue.InternalServiceException"],
+          "IntervalSeconds": 60,
+          "MaxAttempts": 3,
+          "BackoffRate": 2.0
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "ResultPath": "$.error",
+          "Next": "RecordSilverFailure"
+        }
+      ],
+      "Next": "ReadSilverVerdict"
+    },
+
+    "ReadSilverVerdict": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${quality_gate_function_arn}",
+        "Payload": {
+          "layer": "silver"
+        }
+      },
+      "ResultSelector": {
+        "passed.$": "$.Payload.passed",
+        "pass_rate_pct.$": "$.Payload.pass_rate_pct",
+        "failed_count.$": "$.Payload.failed_count",
+        "failed_rules.$": "$.Payload.failed_rules",
+        "report_uri.$": "$.Payload.report_uri",
+        "layer.$": "$.Payload.layer"
+      },
+      "ResultPath": "$.quality",
+      "Retry": [
+        {
+          "ErrorEquals": ["Lambda.ServiceException", "Lambda.TooManyRequestsException", "Lambda.SdkClientException"],
+          "IntervalSeconds": 5,
+          "MaxAttempts": 3,
+          "BackoffRate": 2.0
+        }
+      ],
+      "Next": "SilverQualityChoice"
+    },
+
+    "SilverQualityChoice": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.quality.passed",
+          "BooleanEquals": true,
+          "Next": "RunGoldJob"
+        }
+      ],
+      "Default": "MarkQualityFailure"
+    },
+
+    "RunGoldJob": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::glue:startJobRun.sync",
+      "Comment": "The aggregates the SQL agent queries. Recomputes a trailing window so late-arriving records are picked up.",
+      "Parameters": {
+        "JobName": "${gold_job_name}"
+      },
+      "ResultPath": null,
+      "Retry": [
+        {
+          "ErrorEquals": ["Glue.ConcurrentRunsExceededException", "Glue.InternalServiceException"],
+          "IntervalSeconds": 60,
+          "MaxAttempts": 3,
+          "BackoffRate": 2.0
+        },
+        {
+          "ErrorEquals": ["States.TaskFailed"],
+          "IntervalSeconds": 30,
+          "MaxAttempts": 1,
+          "BackoffRate": 2.0
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "ResultPath": "$.error",
+          "Next": "RecordGoldFailure"
+        }
+      ],
+      "Next": "RefreshKnowledgeBase"
+    },
+
+    "RefreshKnowledgeBase": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Comment": "Re-ingests the policy corpus into the Bedrock Knowledge Base. Non-fatal: stale retrieval is a degraded answer, whereas a failed pipeline over good data is a false alarm.",
+      "Parameters": {
+        "FunctionName": "${kb_refresh_function_arn}",
+        "Payload": {
+          "trigger.$": "$.trigger"
+        }
+      },
+      "ResultSelector": {
+        "status.$": "$.Payload.status",
+        "detail.$": "$.Payload.detail"
+      },
+      "ResultPath": "$.knowledge_base",
+      "Retry": [
+        {
+          "ErrorEquals": ["Lambda.ServiceException", "Lambda.TooManyRequestsException"],
+          "IntervalSeconds": 10,
+          "MaxAttempts": 2,
+          "BackoffRate": 2.0
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "ResultPath": "$.knowledge_base",
+          "Next": "PipelineSucceeded"
+        }
+      ],
+      "Next": "PipelineSucceeded"
+    },
+
+    "PipelineSucceeded": {
+      "Type": "Succeed",
+      "Comment": "Bronze, silver, and gold all wrote, and both quality gates passed."
+    },
+
+    "RecordBronzeFailure": {
+      "Type": "Pass",
+      "Parameters": {
+        "failure_type": "glue_error",
+        "stage": "bronze",
+        "execution_arn.$": "$$.Execution.Id",
+        "error.$": "$.error"
+      },
+      "Next": "WriteFailureReport"
+    },
+
+    "RecordSilverFailure": {
+      "Type": "Pass",
+      "Parameters": {
+        "failure_type": "glue_error",
+        "stage": "silver",
+        "execution_arn.$": "$$.Execution.Id",
+        "error.$": "$.error"
+      },
+      "Next": "WriteFailureReport"
+    },
+
+    "RecordGoldFailure": {
+      "Type": "Pass",
+      "Parameters": {
+        "failure_type": "glue_error",
+        "stage": "gold",
+        "execution_arn.$": "$$.Execution.Id",
+        "error.$": "$.error"
+      },
+      "Next": "WriteFailureReport"
+    },
+
+    "MarkQualityFailure": {
+      "Type": "Pass",
+      "Comment": "Reached when a gate returned passed=false. Downstream stages are skipped by construction — there is no edge from here to silver or gold.",
+      "Parameters": {
+        "failure_type": "quality_gate",
+        "stage.$": "$.quality.layer",
+        "execution_arn.$": "$$.Execution.Id",
+        "quality.$": "$.quality"
+      },
+      "Next": "WriteFailureReport"
+    },
+
+    "WriteFailureReport": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Comment": "Writes the report to S3 and publishes to SNS before failing, so the notification survives the execution ending.",
+      "Parameters": {
+        "FunctionName": "${failure_report_function_arn}",
+        "Payload.$": "$"
+      },
+      "ResultSelector": {
+        "report_uri.$": "$.Payload.report_uri"
+      },
+      "ResultPath": "$.report",
+      "Retry": [
+        {
+          "ErrorEquals": ["Lambda.ServiceException", "Lambda.TooManyRequestsException"],
+          "IntervalSeconds": 5,
+          "MaxAttempts": 3,
+          "BackoffRate": 2.0
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "ResultPath": "$.report",
+          "Next": "PipelineFailed"
+        }
+      ],
+      "Next": "PipelineFailed"
+    },
+
+    "PipelineFailed": {
+      "Type": "Fail",
+      "Error": "FraudLakePipelineHalted",
+      "Comment": "A meaningful cause, not 'States.TaskFailed'. The stage name is what tells an on-call reader where to look.",
+      "CausePath": "States.Format('Pipeline halted at stage {} ({}). Downstream layers skipped; last good data retained. Report: {}', $.stage, $.failure_type, $.report.report_uri)"
+    }
+  }
+}
