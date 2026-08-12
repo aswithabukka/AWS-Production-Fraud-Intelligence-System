@@ -94,3 +94,29 @@ Base does not delete the collection it created**; it keeps billing from a differ
 This is the single reason the project uses **S3 Vectors** instead.
 MSK / MSK Serverless — per-cluster hourly rate. Bedrock provisioned throughput — hourly commitment.
 NAT Gateway. RDS/Aurora provisioned.
+
+---
+
+## Slices 1b–3 (filled in as built — before apply, per the house rule)
+
+| Resource | Pricing shape | Est. monthly (dev usage) | Teardown step |
+|---|---|---|---|
+| Glue jobs ×4 (2×G.1X, 15-min cap) | Per-request (DPU-second, 1-min min) | ~$0.30/run of the full pipeline; $0 idle | `make destroy` |
+| Glue Data Quality evaluations | Per-request (DPU-second) | included above | `make destroy` |
+| Step Functions (Standard) | Per-request (~12 transitions/run) | $0 (free tier: 4,000/mo) | `make destroy` |
+| Lambda ×4 (128–256 MB, ≤60s) | Per-request | $0 (free tier) | `make destroy` |
+| EventBridge Scheduler (hourly, **disabled by default**) | Per-invocation | $0 while disabled | `enable_schedule=false` |
+| SNS topic + email | Per-request | <$0.01 | `make destroy` |
+| CloudWatch alarms ×5 | ~$0.10/alarm/mo | ~$0.50 | `make destroy` |
+| CloudWatch dashboard ×1 | First 3 free | $0 | `make destroy` |
+| Bedrock Knowledge Base on **S3 Vectors** | Per-request (storage + per-query) | <$0.10 at this corpus size | `make destroy` |
+| Bedrock Guardrails | Per-text-unit | <$0.50 at demo volume | `make destroy` |
+| Bedrock model invocation (Haiku routing/SQL, Sonnet synthesis) | Per-token, capped | ~$1–5/mo at demo usage — the main variable cost | stop asking questions |
+| ECR ×2 repos (lifecycle: keep 5) | Per-GB stored | ~$0.10 | `make destroy` |
+| VPC (public_tasks mode) + S3 gateway endpoint | Free | $0 | `make destroy` |
+| ECS cluster + service (`desired_count=0`) | Per-second while a task runs | $0 at rest; ~$0.01/hr per task when up | `make demo-down` |
+| **ALB (`enable_alb`, default false)** | **Per-hour floor** | ~$16/mo while it exists — independent of task count | `enable_alb=false` |
+| **VPC interface endpoints (`networking_mode=endpoints`, default off)** | **Per-hour floor** | ~$130/mo while up (10 endpoints × 2 AZ) | `networking_mode=public_tasks` |
+| Lake Formation personas + grants | Free | $0 | `make destroy` |
+| CloudTrail (data events scoped to lake bucket, default off) | Per-event | <$1 at demo volume | `enable_cloudtrail=false` |
+| **EKS control plane + 2×t3.small (separate workspace)** | **Per-hour floor** | **~$103/mo if forgotten; ~$1.40 for a 2-hour demo** | `make eks-destroy` — same day, calendar reminder |

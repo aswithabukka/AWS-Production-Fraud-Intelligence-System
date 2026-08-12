@@ -1,0 +1,23 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: fraud-lake
+
+resources:
+  - namespace.yaml
+  - serviceaccount.yaml
+  - configmap.yaml
+  - deployment.yaml
+  - service.yaml
+  - hpa.yaml
+  # ingress.yaml is deliberately NOT included — it provisions an ALB outside Terraform
+  # state. Add it explicitly if a screenshot needs it, and delete it before destroying.
+
+images:
+  - name: fraud-lake/api
+    newName: PLACEHOLDER.dkr.ecr.us-east-1.amazonaws.com/fraud-lake/api
+    newTag: latest
+
+commonLabels:
+  app.kubernetes.io/part-of: fraud-lake
+  app.kubernetes.io/managed-by: kustomize

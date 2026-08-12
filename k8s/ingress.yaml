@@ -1,0 +1,34 @@
+# Requires the AWS Load Balancer Controller. NOT installed by the eks-demo workspace, on
+# purpose: the controller provisions an ALB outside Terraform's state, which is exactly
+# the resource most likely to survive a `terraform destroy` and keep billing.
+#
+# For the demo, prefer:
+#     kubectl -n fraud-lake port-forward svc/fraud-lake-api 8080:80
+#
+# Apply this only if the screenshot specifically needs an ingress, and delete it BEFORE
+# destroying the cluster.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: fraud-lake-api
+  namespace: fraud-lake
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/healthcheck-path: /health
+    alb.ingress.kubernetes.io/load-balancer-attributes: idle_timeout.timeout_seconds=120
+    # Restrict to your own IP. An open demo endpoint in front of a Bedrock-backed service
+    # is someone else's token budget.
+    alb.ingress.kubernetes.io/inbound-cidrs: 127.0.0.1/32
+spec:
+  ingressClassName: alb
+  rules:
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: fraud-lake-api
+                port:
+                  number: 80

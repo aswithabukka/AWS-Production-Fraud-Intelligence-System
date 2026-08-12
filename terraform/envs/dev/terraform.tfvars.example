@@ -1,21 +1,60 @@
 # Copy to terraform.tfvars (gitignored) and edit.
+# Every flag below defaults to the CHEAP option. Turn things on for a demo, off after.
 
 region  = "us-east-1"
 profile = "fraud-lake"
 env     = "dev"
 
-# --- cost levers -------------------------------------------------------------
+# --- slice 1a: ingest --------------------------------------------------------
 
 # false => no Kinesis stream, no Firehose. Saves ~$26-29/month of stream-hours.
-# The lake, Glue catalog, and Athena workgroup stay up and queryable either way.
 enable_stream = true
 
-# true => customer-managed KMS key, ~$1/month. Turn on to capture the encryption
-# screenshot for the security section, then turn it back off.
-use_kms_cmk = false
-
-# 1 GB. Athena's minimum is 10 MB if you want to be stricter while developing.
-athena_scan_cutoff_bytes = 1073741824
-
-# 60 makes data appear in S3 within a minute while demoing; 300 is the production answer.
+# 60 makes data land in S3 within a minute while demoing; 300 is the production shape.
 firehose_buffer_interval_seconds = 300
+
+# --- slice 1c: orchestration -------------------------------------------------
+
+# Hourly schedule. Leave false — each armed hour runs Glue over possibly-zero rows.
+enable_schedule = false
+
+# Event-driven trigger on raw/ arrival. Effectively free; leave on.
+enable_s3_trigger = true
+
+# Get pipeline alerts by email (AWS sends a confirmation link).
+alert_email = ""
+
+# --- slice 2: agent layer ----------------------------------------------------
+
+# Per-request only, BUT requires: (1) Bedrock model access enabled in the console for
+# Claude Haiku 4.5, Claude Sonnet 4.5, and Titan Text Embeddings V2; (2) AWS provider 6.x
+# (terraform init -upgrade).
+enable_agent_layer = false
+
+# --- slice 3: containers -----------------------------------------------------
+
+# VPC + ECR + ECS service. Free at rest with desired_count=0 and no ALB.
+enable_containers = false
+ecs_desired_count = 0
+
+# ~$16/month from the moment it exists, regardless of task count.
+enable_alb = false
+
+# Set to your own IP before enabling the ALB, e.g. ["203.0.113.7/32"].
+allowed_ingress_cidrs = ["127.0.0.1/32"]
+
+# "public_tasks" = $0/month. "endpoints" = ~$130/month while up (tear down same day).
+networking_mode = "public_tasks"
+
+# --- slice 3: governance -----------------------------------------------------
+
+# Free, but changes access semantics — enable after the pipeline has run once.
+enable_lake_formation = false
+
+# Management events free; S3 data events per-event, scoped to the lake bucket.
+enable_cloudtrail = false
+
+# --- misc --------------------------------------------------------------------
+
+# Customer-managed KMS key, ~$1/month. Flip on for the security screenshot, then off.
+use_kms_cmk = false

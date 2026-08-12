@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fraud-lake-config
+  namespace: fraud-lake
+data:
+  AWS_REGION: "us-east-1"
+  ATHENA_WORKGROUP: "fraud-lake"
+  ATHENA_DATABASE: "fraud_gold"
+  # The hard stop on the agent loop. Config, not code, so it can be lowered during a demo
+  # without a rebuild.
+  MAX_ITERATIONS: "5"
+  MAX_ROWS_RETURNED: "200"
+  EMIT_METRICS: "true"
+  METRICS_NAMESPACE: "fraud-lake/agent"
+  # Filled in by kustomize or by hand after the dev stack outputs them. Never secrets —
+  # these are identifiers, and the real credentials come from Pod Identity.
+  KNOWLEDGE_BASE_ID: ""
+  GUARDRAIL_ID: ""
+  STATE_MACHINE_ARN: ""

@@ -1,0 +1,41 @@
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: fraud-lake-api
+  namespace: fraud-lake
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: fraud-lake-api
+
+  minReplicas: 2
+  # Capped at 4: two t3.small nodes cannot usefully run more, and an HPA whose ceiling
+  # exceeds the cluster's capacity produces pending pods rather than throughput.
+  maxReplicas: 4
+
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 60
+
+  behavior:
+    scaleUp:
+      # React quickly: the demo is a load test, and a 5-minute stabilisation window would
+      # end before the HPA did anything visible.
+      stabilizationWindowSeconds: 30
+      policies:
+        - type: Percent
+          value: 100
+          periodSeconds: 30
+    scaleDown:
+      # Scale down slowly. Flapping between 2 and 4 replicas looks like instability in a
+      # screenshot and is worse than being briefly over-provisioned.
+      stabilizationWindowSeconds: 180
+      policies:
+        - type: Pods
+          value: 1
+          periodSeconds: 60

@@ -1,0 +1,73 @@
+# Local development.
+#
+# The API and MCP server run against REAL AWS (Athena, Bedrock, Glue) using your local
+# credentials, mounted read-only. LocalStack backs only S3 and Step Functions for the
+# offline paths, because the services that matter here — Athena's engine, Bedrock's
+# models, Glue Data Quality — have no useful local emulation. Pretending otherwise
+# produces a local environment that passes while production fails.
+#
+# COST: running this calls real Bedrock and Athena. It is per-request and small, but it
+# is not zero. `make seed-local` and the pytest suite are the genuinely free paths.
+
+name: fraud-lake
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      AWS_PROFILE: ${AWS_PROFILE:-fraud-lake}
+      ATHENA_WORKGROUP: ${ATHENA_WORKGROUP:-fraud-lake}
+      ATHENA_DATABASE: fraud_gold
+      KNOWLEDGE_BASE_ID: ${KNOWLEDGE_BASE_ID:-}
+      GUARDRAIL_ID: ${GUARDRAIL_ID:-}
+      STATE_MACHINE_ARN: ${STATE_MACHINE_ARN:-}
+      MAX_ITERATIONS: ${MAX_ITERATIONS:-5}
+      # Off locally: local runs would otherwise pollute the dashboard the pipeline's real
+      # metrics are read from.
+      EMIT_METRICS: "false"
+    volumes:
+      - ${HOME}/.aws:/home/app/.aws:ro
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=4).status==200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  mcp:
+    build:
+      context: .
+      dockerfile: Dockerfile.mcp
+    # stdio transport — no ports. Attach with `docker compose run --rm mcp`, or point an
+    # MCP client at that command.
+    stdin_open: true
+    tty: true
+    environment:
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      AWS_PROFILE: ${AWS_PROFILE:-fraud-lake}
+      ATHENA_WORKGROUP: ${ATHENA_WORKGROUP:-fraud-lake}
+      KNOWLEDGE_BASE_ID: ${KNOWLEDGE_BASE_ID:-}
+      EMIT_METRICS: "false"
+    volumes:
+      - ${HOME}/.aws:/home/app/.aws:ro
+
+  localstack:
+    image: localstack/localstack:3.8
+    profiles: ["offline"]
+    ports:
+      - "4566:4566"
+    environment:
+      # Only what genuinely emulates well. Athena, Bedrock, and Glue DQ are absent on
+      # purpose — see the note at the top of this file.
+      SERVICES: s3,stepfunctions,events,logs
+      DEBUG: "0"
+      PERSISTENCE: "0"
+    volumes:
+      - localstack-data:/var/lib/localstack
+
+volumes:
+  localstack-data:

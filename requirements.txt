@@ -1,0 +1,11 @@
+# Runtime dependencies for the API and MCP server images.
+# PySpark is deliberately absent — Glue supplies its own Spark, and adding ~300 MB of it
+# to a container that never runs Spark would triple the image size for nothing.
+boto3==1.35.*
+botocore==1.35.*
+langgraph==0.2.*
+sqlglot==25.*
+fastapi==0.115.*
+uvicorn[standard]==0.32.*
+pydantic==2.9.*
+mcp>=1.2

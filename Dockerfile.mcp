@@ -1,0 +1,42 @@
+# MCP server image.
+#
+# Separate from the API image because the transports have genuinely different shapes: the
+# MCP server speaks stdio to a single client and has no port, no health endpoint, and no
+# load balancer. Sharing one image would mean shipping an HTTP stack into a process that
+# never listens.
+
+FROM python:3.12-slim AS builder
+
+ENV PIP_NO_CACHE_DIR=1 PIP_DISABLE_PIP_VERSION_CHECK=1
+WORKDIR /build
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt .
+RUN pip install --user -r requirements.txt
+
+FROM python:3.12-slim AS runtime
+
+RUN groupadd --gid 10001 app \
+    && useradd --uid 10001 --gid app --create-home --shell /usr/sbin/nologin app
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PATH=/home/app/.local/bin:$PATH
+
+WORKDIR /app
+
+COPY --from=builder --chown=app:app /root/.local /home/app/.local
+COPY --chown=app:app agents/ ./agents/
+COPY --chown=app:app mcp_server/ ./mcp_server/
+
+USER app
+
+# stdio transport: liveness is "the process is up and the tool registry imports". A
+# port-based healthcheck would be meaningless here.
+HEALTHCHECK --interval=60s --timeout=10s --start-period=10s --retries=2 \
+    CMD python -c "import mcp_server.server; import sys; sys.exit(0)"
+
+CMD ["python", "-m", "mcp_server.server"]
