@@ -1,0 +1,21 @@
+# Copy to terraform.tfvars (gitignored) and edit.
+
+region  = "us-east-1"
+profile = "fraud-lake"
+env     = "dev"
+
+# --- cost levers -------------------------------------------------------------
+
+# false => no Kinesis stream, no Firehose. Saves ~$26-29/month of stream-hours.
+# The lake, Glue catalog, and Athena workgroup stay up and queryable either way.
+enable_stream = true
+
+# true => customer-managed KMS key, ~$1/month. Turn on to capture the encryption
+# screenshot for the security section, then turn it back off.
+use_kms_cmk = false
+
+# 1 GB. Athena's minimum is 10 MB if you want to be stricter while developing.
+athena_scan_cutoff_bytes = 1073741824
+
+# 60 makes data appear in S3 within a minute while demoing; 300 is the production answer.
+firehose_buffer_interval_seconds = 300

@@ -1,0 +1,39 @@
+# terraform
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+*.tfplan
+tfplan
+crash.log
+crash.*.log
+*.tfvars
+!*.tfvars.example
+.terraform.lock.hcl
+
+# python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+*.egg-info/
+
+# aws / secrets — never commit these
+.env
+.env.*
+credentials
+*.pem
+*.key
+
+# local data
+data/
+*.parquet
+!tests/fixtures/**
+
+# os / editor
+.DS_Store
+.idea/
+.vscode/

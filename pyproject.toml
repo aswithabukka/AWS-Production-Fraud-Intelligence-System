@@ -1,0 +1,20 @@
+[project]
+name = "fraud-lake"
+version = "0.1.0"
+description = "AWS streaming lakehouse with an agentic analytics layer over card-transaction fraud data"
+requires-python = ">=3.11"
+
+[tool.ruff]
+line-length = 110
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM"]
+ignore = [
+    "B008", # function call in argument default — argparse patterns are fine
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q --strict-markers"
+filterwarnings = ["error::DeprecationWarning"]
