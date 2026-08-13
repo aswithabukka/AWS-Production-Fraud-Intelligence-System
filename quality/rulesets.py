@@ -70,8 +70,10 @@ Rules = [{referential_rule}
     # Currency is allowed to be sparse in a way the identifiers are not.
     Completeness "currency" > 0.99,
 
-    # The pipeline is stalled if the newest record is older than this.
-    ColumnValues "transaction_timestamp" > (now() - {FRESHNESS_HOURS} hours),
+    # The pipeline is stalled if the data is older than this. DataFreshness is the
+    # purpose-built DQDL rule; a hand-rolled ColumnValues comparison against
+    # (now() - N hours) evaluated to 0% passing on provably fresh data.
+    DataFreshness "transaction_timestamp" <= {FRESHNESS_HOURS} hours,
 
     # An empty run is a failure, not a success. Without this rule a broken upstream
     # produces a green pipeline over zero rows — the worst possible outcome, because
