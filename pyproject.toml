@@ -14,6 +14,11 @@ ignore = [
     "B008", # function call in argument default — argparse patterns are fine
 ]
 
+[tool.ruff.lint.per-file-ignores]
+# DQDL rules are single-line by nature; wrapping the embedded SQL to satisfy the
+# line-length limit would risk breaking the rule parser.
+"quality/rulesets.py" = ["E501"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q --strict-markers"

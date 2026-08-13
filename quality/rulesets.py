@@ -40,9 +40,12 @@ def bronze_ruleset(
     """
     referential_rule = (
         f"""
-    # Every merchant_id in bronze must exist in the merchant dimension. This is the rule
-    # the corrupted-batch exercise trips with its unknown_merchant records.
-    ReferentialIntegrity "merchant_id" "{merchant_dim_table}.{{merchant_id}}" = 1.0,
+    # Every merchant_id in bronze must exist in the merchant dimension — the rule the
+    # corrupted-batch exercise trips with its unknown_merchant records. Expressed as a
+    # Spark anti-join rather than DQDL ReferentialIntegrity: that rule resolves its
+    # reference against data sources wired into the evaluator call, not catalog paths,
+    # whereas CustomSql runs in the session where the Iceberg catalog already exists.
+    CustomSql "SELECT COUNT(*) FROM primary p LEFT ANTI JOIN glue_catalog.{merchant_dim_table} d ON p.merchant_id = d.merchant_id" = 0,
 """
         if include_referential
         else ""
@@ -104,7 +107,9 @@ Rules = [
     Completeness "amount_zscore_30d" > 0.30,
 
     # Risk score is a probability. Outside [0, 1] means the smoothing maths is wrong.
-    ColumnValues "merchant_risk_score" between 0 and 1,
+    # Bounds nudged outward: DQDL between excludes its boundaries, and a merchant with
+    # zero observed fraud in a zero-fraud window would sit exactly on 0.
+    ColumnValues "merchant_risk_score" between -0.001 and 1.001,
     IsComplete "merchant_risk_score",
     ColumnValues "merchant_risk_tier" in ["low", "medium", "high", "unknown"],
 
@@ -150,7 +155,7 @@ Rules = [
     # A grain that is not unique means the GROUP BY is wrong and every number in the
     # table is double-counted. DQDL's IsUnique is single-column only, so the composite
     # grain is checked with SQL.
-    CustomSql "SELECT COUNT(*) FROM (SELECT dt, mcc, channel FROM primary GROUP BY dt, mcc, channel HAVING COUNT(*) > 1)" = 0,
+    CustomSql "SELECT COUNT(*) FROM (SELECT dt, mcc, channel FROM primary GROUP BY dt, mcc, channel HAVING COUNT(*) > 1) grain_dupes" = 0,
 
     RowCount > 0
 ]
