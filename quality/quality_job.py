@@ -23,6 +23,7 @@ import boto3
 from awsglue.context import GlueContext
 from awsglue.dynamicframe import DynamicFrame
 from awsglue.job import Job
+from awsglue.transforms import SelectFromCollection
 from awsglue.utils import getResolvedOptions
 from awsgluedq.transforms import EvaluateDataQuality
 from pyspark.conf import SparkConf
@@ -109,7 +110,11 @@ def main() -> None:
         additional_options={"performanceTuning.caching": "CACHE_NOTHING"},
     )
 
-    results = outcomes.toDF().select("Rule", "Outcome", "FailureReason").collect()
+    # process_rows returns a DynamicFrameCollection with two frames: per-rule verdicts
+    # ("ruleOutcomes") and per-row annotations ("rowLevelOutcomes"). The gate branches on
+    # rules, so select that frame out of the collection.
+    rule_outcomes = SelectFromCollection.apply(dfc=outcomes, key="ruleOutcomes")
+    results = rule_outcomes.toDF().select("Rule", "Outcome", "FailureReason").collect()
     report = _build_report(layer, table, results)
 
     _write_report(args["report_path"], layer, report)
