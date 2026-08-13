@@ -185,7 +185,11 @@ data "aws_iam_policy_document" "glue" {
     condition {
       test     = "StringLike"
       variable = "cloudwatch:namespace"
-      values   = ["fraud-lake/*"]
+
+      # "Glue Data Quality" is the AWS-owned namespace EvaluateDataQuality publishes to
+      # when enableDataQualityCloudWatchMetrics is on — discovered the hard way when the
+      # gate's own metric publishing was denied by this very condition.
+      values = ["fraud-lake/*", "Glue Data Quality"]
     }
   }
 
