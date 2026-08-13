@@ -23,14 +23,32 @@ FRESHNESS_HOURS = 3
 _CHANNEL_LIST = ", ".join(f'"{c}"' for c in VALID_CHANNELS)
 
 
-def bronze_ruleset(merchant_dim_table: str = "fraud_silver.merchant_dim") -> str:
+def bronze_ruleset(
+    merchant_dim_table: str = "fraud_silver.merchant_dim",
+    include_referential: bool = True,
+) -> str:
     """Structural integrity of the bronze table.
 
     `merchant_dim_table` is fully qualified because ReferentialIntegrity resolves it
     through the Glue Catalog, not the current database.
+
+    `include_referential=False` is the cold-start mode: the merchant dimension is
+    *created by the silver job*, which runs after this gate — so on the very first
+    pipeline run the referenced table cannot exist yet. The quality job detects that
+    and drops the one rule rather than failing the whole pipeline on a bootstrapping
+    paradox. From the second run onward the rule is always enforced.
     """
+    referential_rule = (
+        f"""
+    # Every merchant_id in bronze must exist in the merchant dimension. This is the rule
+    # the corrupted-batch exercise trips with its unknown_merchant records.
+    ReferentialIntegrity "merchant_id" "{merchant_dim_table}.{{merchant_id}}" = 1.0,
+"""
+        if include_referential
+        else ""
+    )
     return f"""
-Rules = [
+Rules = [{referential_rule}
     # Nothing downstream can identify a transaction without these three.
     IsComplete "transaction_id",
     IsComplete "customer_id",
@@ -51,10 +69,6 @@ Rules = [
 
     # Currency is allowed to be sparse in a way the identifiers are not.
     Completeness "currency" > 0.99,
-
-    # Every merchant_id in bronze must exist in the merchant dimension. This is the rule
-    # the corrupted-batch exercise trips with its unknown_merchant records.
-    ReferentialIntegrity "merchant_id" "{merchant_dim_table}.{{merchant_id}}" = 1.0,
 
     # The pipeline is stalled if the newest record is older than this.
     ColumnValues "transaction_timestamp" > (now() - {FRESHNESS_HOURS} hours),

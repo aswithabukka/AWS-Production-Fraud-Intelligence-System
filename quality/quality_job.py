@@ -28,8 +28,33 @@ from awsgluedq.transforms import EvaluateDataQuality
 from pyspark.context import SparkContext
 from pyspark.sql import functions as F
 
-from glue.spark_utils import CATALOG, get_logger, iceberg_spark_conf
-from quality.rulesets import RULESETS
+from glue.spark_utils import CATALOG, get_logger, iceberg_spark_conf, table_exists
+from quality.rulesets import RULESETS, bronze_ruleset
+
+MERCHANT_DIM_TABLE = "fraud_silver.merchant_dim"
+
+
+def _resolve_ruleset(spark, layer: str) -> str:
+    """Pick the ruleset, handling the cold-start paradox on bronze.
+
+    The bronze referential-integrity rule references the merchant dimension, which is
+    created by the *silver* job — downstream of this gate. On the very first pipeline
+    run that table cannot exist yet, so the rule is dropped for that run only and the
+    report says so. Every subsequent run enforces it.
+    """
+    if layer != "bronze":
+        return RULESETS[layer]
+
+    if table_exists(spark, f"{CATALOG}.{MERCHANT_DIM_TABLE}"):
+        return RULESETS[layer]
+
+    logger.warning(
+        "cold start: %s does not exist yet (created by the silver job); "
+        "dropping the ReferentialIntegrity rule for this run only",
+        MERCHANT_DIM_TABLE,
+    )
+    return bronze_ruleset(include_referential=False)
+
 
 REQUIRED_ARGS = [
     "JOB_NAME",
@@ -64,9 +89,11 @@ def main() -> None:
     df = spark.table(table)
     dyf = DynamicFrame.fromDF(df, glue_context, f"{layer}_dq")
 
+    ruleset = _resolve_ruleset(spark, layer)
+
     outcomes = EvaluateDataQuality().process_rows(
         frame=dyf,
-        ruleset=RULESETS[layer],
+        ruleset=ruleset,
         publishing_options={
             "dataQualityEvaluationContext": f"fraud_lake_{layer}",
             # Glue DQ can publish straight to CloudWatch — no custom metric plumbing.

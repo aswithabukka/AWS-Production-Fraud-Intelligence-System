@@ -8,20 +8,13 @@ terraform {
     }
   }
 
-  # Remote state. Commented out until `terraform/bootstrap` has been applied, because
-  # the backend bucket has to exist before `terraform init` can use it.
-  #
-  #   1. cd terraform/bootstrap && terraform init && terraform apply
-  #   2. copy the bucket + table names from its output into the block below
-  #   3. uncomment, then: terraform init -migrate-state
-  #
-  # Both backend resources are per-request priced — a few cents a year at this volume.
-  #
-  # backend "s3" {
-  #   bucket         = "fraud-lake-tfstate-<account-id>"
-  #   key            = "envs/dev/terraform.tfstate"
-  #   region         = "us-east-1"
-  #   dynamodb_table = "fraud-lake-tflock"
-  #   encrypt        = true
-  # }
+  # Remote state, created by terraform/bootstrap. Per-request priced — cents a year.
+  backend "s3" {
+    bucket         = "fraud-lake-tfstate-434661699277"
+    key            = "envs/dev/terraform.tfstate"
+    region         = "us-east-1"
+    profile        = "fraud-lake"
+    dynamodb_table = "fraud-lake-tflock"
+    encrypt        = true
+  }
 }
