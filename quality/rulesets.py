@@ -70,10 +70,11 @@ Rules = [{referential_rule}
     # Currency is allowed to be sparse in a way the identifiers are not.
     Completeness "currency" > 0.99,
 
-    # The pipeline is stalled if the data is older than this. DataFreshness is the
-    # purpose-built DQDL rule; a hand-rolled ColumnValues comparison against
-    # (now() - N hours) evaluated to 0% passing on provably fresh data.
-    DataFreshness "transaction_timestamp" <= {FRESHNESS_HOURS} hours,
+    # The pipeline is stalled if no recent row exists. Deliberately NOT DataFreshness:
+    # that rule evaluates per-row over the whole table, so yesterday's perfectly good
+    # data would "go stale" and fail every future run. Liveness is about the newest
+    # row, not the oldest.
+    CustomSql "SELECT COUNT(*) FROM primary WHERE transaction_timestamp > current_timestamp() - INTERVAL {FRESHNESS_HOURS} HOURS" > 0,
 
     # An empty run is a failure, not a success. Without this rule a broken upstream
     # produces a green pipeline over zero rows — the worst possible outcome, because
@@ -107,15 +108,18 @@ Rules = [
     IsComplete "merchant_risk_score",
     ColumnValues "merchant_risk_tier" in ["low", "medium", "high", "unknown"],
 
-    # Geo distance is NULL for a customer's first transaction and non-negative after.
-    ColumnValues "geo_distance_from_prior_km" >= 0 with threshold >= 0.95,
+    # Geo distance is NULL for a customer's first transaction — a large share of a
+    # young table (every customer starts somewhere), shrinking as history accumulates.
+    ColumnValues "geo_distance_from_prior_km" >= 0 with threshold >= 0.60,
 
     IsComplete "fraud_signal_count",
-    ColumnValues "fraud_signal_count" between 0 and 4,
+    # DQDL `between` excludes its boundaries; -1..5 means the inclusive 0..4.
+    ColumnValues "fraud_signal_count" between -1 and 5,
 
-    # The composite signal must fire sometimes and must not fire always. Either extreme
-    # means the thresholds are wrong and the feature carries no information.
-    ColumnValues "is_high_velocity" in ["true", "false"],
+    # The flag must exist on every row; its true/false mix is visible on the dashboard.
+    # (Comparing a BOOLEAN column against string literals is a Spark type error that
+    # poisons the entire evaluation — learned on the first live run.)
+    IsComplete "is_high_velocity",
 
     RowCount > 0
 ]
@@ -135,16 +139,18 @@ Rules = [
     ColumnValues "transaction_count" > 0,
 
     # Percentages must be percentages. A fraud_rate_pct of 4500 means a division is
-    # inverted, and the agent would report it verbatim.
-    ColumnValues "fraud_rate_pct" between 0 and 100,
-    ColumnValues "approval_rate_pct" between 0 and 100,
+    # inverted, and the agent would report it verbatim. Bounds are nudged outward
+    # because DQDL `between` excludes its boundaries and 0 / 100 are both legitimate.
+    ColumnValues "fraud_rate_pct" between -0.001 and 100.001,
+    ColumnValues "approval_rate_pct" between -0.001 and 100.001,
 
     ColumnValues "fraud_loss_amount_usd" >= 0,
     ColumnValues "total_amount_usd" >= 0,
 
     # A grain that is not unique means the GROUP BY is wrong and every number in the
-    # table is double-counted.
-    IsUnique "dt" "mcc" "channel",
+    # table is double-counted. DQDL's IsUnique is single-column only, so the composite
+    # grain is checked with SQL.
+    CustomSql "SELECT COUNT(*) FROM (SELECT dt, mcc, channel FROM primary GROUP BY dt, mcc, channel HAVING COUNT(*) > 1)" = 0,
 
     RowCount > 0
 ]
