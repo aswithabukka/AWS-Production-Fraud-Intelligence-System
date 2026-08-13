@@ -23,5 +23,5 @@ output "estimated_cost_per_hour_usd" {
 
 output "estimated_cost_if_forgotten_monthly_usd" {
   description = "What this costs if you do not destroy it today."
-  value       = round((0.10 + (var.node_count * 0.0208)) * 24 * 30)
+  value       = floor((0.10 + (var.node_count * 0.0208)) * 24 * 30)
 }

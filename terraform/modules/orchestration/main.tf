@@ -349,11 +349,11 @@ resource "aws_scheduler_schedule" "hourly" {
 resource "aws_lambda_permission" "s3_invoke" {
   count = var.enable_s3_trigger ? 1 : 0
 
-  statement_id  = "AllowS3Invoke"
-  action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.fn["s3_trigger"].function_name
-  principal     = "s3.amazonaws.com"
-  source_arn    = var.lake_bucket_arn
+  statement_id   = "AllowS3Invoke"
+  action         = "lambda:InvokeFunction"
+  function_name  = aws_lambda_function.fn["s3_trigger"].function_name
+  principal      = "s3.amazonaws.com"
+  source_arn     = var.lake_bucket_arn
   source_account = var.account_id
 }
 

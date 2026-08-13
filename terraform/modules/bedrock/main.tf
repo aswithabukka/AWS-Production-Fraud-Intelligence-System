@@ -44,8 +44,8 @@ resource "aws_s3vectors_index" "policies" {
 
   # Must match the embedding model's output dimension exactly. Titan Text Embeddings V2
   # emits 1024 by default; a mismatch here fails at ingestion with an unhelpful error.
-  dimension          = var.embedding_dimension
-  distance_metric    = "cosine"
+  dimension       = var.embedding_dimension
+  distance_metric = "cosine"
 
   metadata_configuration {
     # Excluded from filterable metadata: the chunk text is large and is retrieved, not
@@ -121,8 +121,8 @@ data "aws_iam_policy_document" "knowledge_base" {
     ]
 
     resources = [
-      aws_s3vectors_vector_bucket.policies.arn,
-      aws_s3vectors_index.policies.arn,
+      aws_s3vectors_vector_bucket.policies.vector_bucket_arn,
+      aws_s3vectors_index.policies.index_arn,
     ]
   }
 }
@@ -153,7 +153,7 @@ resource "aws_bedrockagent_knowledge_base" "policies" {
     type = "S3_VECTORS"
 
     s3_vectors_configuration {
-      index_arn = aws_s3vectors_index.policies.arn
+      index_arn = aws_s3vectors_index.policies.index_arn
     }
   }
 

@@ -43,16 +43,16 @@ locals {
   # Interface endpoints required when tasks have no internet route. Each one bills per
   # hour per AZ — the list length is the monthly bill.
   interface_services = [
-    "ecr.api",              # pull image manifests
-    "ecr.dkr",              # pull image layers
-    "logs",                 # container logs
-    "athena",               # query_lakehouse
-    "glue",                 # schema introspection
-    "bedrock-runtime",      # Converse
+    "ecr.api",               # pull image manifests
+    "ecr.dkr",               # pull image layers
+    "logs",                  # container logs
+    "athena",                # query_lakehouse
+    "glue",                  # schema introspection
+    "bedrock-runtime",       # Converse
     "bedrock-agent-runtime", # Knowledge Base retrieval
-    "sts",                  # task role credentials
-    "monitoring",           # PutMetricData
-    "states",               # pipeline_status
+    "sts",                   # task role credentials
+    "monitoring",            # PutMetricData
+    "states",                # pipeline_status
   ]
 }
 

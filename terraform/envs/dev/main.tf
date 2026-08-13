@@ -171,18 +171,18 @@ module "ecs" {
   log_retention_days    = var.log_retention_days
 
   environment = {
-    AWS_REGION         = var.region
-    ATHENA_WORKGROUP   = module.athena.workgroup_name
-    ATHENA_DATABASE    = "fraud_gold"
+    AWS_REGION             = var.region
+    ATHENA_WORKGROUP       = module.athena.workgroup_name
+    ATHENA_DATABASE        = "fraud_gold"
     ATHENA_OUTPUT_LOCATION = module.athena.results_uri
-    STATE_MACHINE_ARN  = module.orchestration.state_machine_arn
-    KNOWLEDGE_BASE_ID  = var.enable_agent_layer ? module.bedrock[0].knowledge_base_id : ""
-    GUARDRAIL_ID       = var.enable_agent_layer ? module.bedrock[0].guardrail_id : ""
-    GUARDRAIL_VERSION  = var.enable_agent_layer ? module.bedrock[0].guardrail_version : "DRAFT"
-    ROUTING_MODEL_ID   = var.routing_model_id
-    SQL_MODEL_ID       = var.sql_model_id
-    SYNTHESIS_MODEL_ID = var.synthesis_model_id
-    MAX_ITERATIONS     = tostring(var.max_iterations)
+    STATE_MACHINE_ARN      = module.orchestration.state_machine_arn
+    KNOWLEDGE_BASE_ID      = var.enable_agent_layer ? module.bedrock[0].knowledge_base_id : ""
+    GUARDRAIL_ID           = var.enable_agent_layer ? module.bedrock[0].guardrail_id : ""
+    GUARDRAIL_VERSION      = var.enable_agent_layer ? module.bedrock[0].guardrail_version : "DRAFT"
+    ROUTING_MODEL_ID       = var.routing_model_id
+    SQL_MODEL_ID           = var.sql_model_id
+    SYNTHESIS_MODEL_ID     = var.synthesis_model_id
+    MAX_ITERATIONS         = tostring(var.max_iterations)
   }
 }
 

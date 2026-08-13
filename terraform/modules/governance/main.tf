@@ -116,8 +116,8 @@ resource "aws_lakeformation_permissions" "analyst_metrics" {
   permissions = ["SELECT"]
 
   table_with_columns {
-    database_name    = var.gold_database
-    name             = var.fraud_metrics_table
+    database_name         = var.gold_database
+    name                  = var.fraud_metrics_table
     excluded_column_names = var.analyst_excluded_columns
   }
 }

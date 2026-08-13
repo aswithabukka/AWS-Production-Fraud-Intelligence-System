@@ -170,8 +170,6 @@ resource "aws_kinesis_firehose_delivery_stream" "raw" {
     }
   }
 
-  server_side_encryption {
-    # Source records arrive already encrypted from Kinesis; this covers the buffer.
-    enabled = false
-  }
+  # No server_side_encryption block: the provider rejects it alongside
+  # kinesis_source_configuration — source records arrive already encrypted from Kinesis.
 }

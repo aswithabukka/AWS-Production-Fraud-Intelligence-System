@@ -87,18 +87,18 @@ resource "aws_glue_catalog_table" "raw_transactions" {
   table_type    = "EXTERNAL_TABLE"
 
   parameters = {
-    "classification" = "json"
+    "classification"  = "json"
     "compressionType" = "gzip"
-    "EXTERNAL"       = "TRUE"
+    "EXTERNAL"        = "TRUE"
 
     # Partition projection — no crawler, no MSCK REPAIR, no per-run charge.
-    "projection.enabled"      = "true"
-    "projection.dt.type"      = "date"
-    "projection.dt.format"    = "yyyy-MM-dd"
-    "projection.dt.range"     = "${var.projection_start_date},NOW"
-    "projection.dt.interval"  = "1"
+    "projection.enabled"          = "true"
+    "projection.dt.type"          = "date"
+    "projection.dt.format"        = "yyyy-MM-dd"
+    "projection.dt.range"         = "${var.projection_start_date},NOW"
+    "projection.dt.interval"      = "1"
     "projection.dt.interval.unit" = "DAYS"
-    "storage.location.template" = "s3://${var.lake_bucket_id}/raw/transactions/dt=$${dt}"
+    "storage.location.template"   = "s3://${var.lake_bucket_id}/raw/transactions/dt=$${dt}"
   }
 
   partition_keys {

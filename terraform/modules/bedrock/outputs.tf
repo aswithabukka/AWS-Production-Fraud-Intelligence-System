@@ -27,7 +27,7 @@ output "agent_role_arn" {
 }
 
 output "vector_index_arn" {
-  value = aws_s3vectors_index.policies.arn
+  value = aws_s3vectors_index.policies.index_arn
 }
 
 output "policy_documents_uploaded" {

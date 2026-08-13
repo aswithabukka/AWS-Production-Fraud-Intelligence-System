@@ -25,8 +25,8 @@ locals {
       script  = "silver_job.py"
       timeout = var.job_timeout_minutes
       args = {
-        "--bronze_table"      = var.bronze_table
-        "--silver_table"      = var.silver_table
+        "--bronze_table"       = var.bronze_table
+        "--silver_table"       = var.silver_table
         "--merchant_dim_table" = var.merchant_dim_table
       }
     }
@@ -254,18 +254,18 @@ resource "aws_glue_job" "job" {
       "--extra-py-files" = "s3://${var.lake_bucket_id}/${aws_s3_object.libs.key}"
       "--warehouse_uri"  = "s3://${var.lake_bucket_id}/warehouse"
 
-      "--enable-auto-scaling"                = "true"
-      "--enable-metrics"                     = "true"
-      "--enable-continuous-cloudwatch-log"   = "true"
-      "--enable-observability-metrics"       = "true"
-      "--continuous-log-logGroup"            = aws_cloudwatch_log_group.glue.name
-      "--job-bookmark-option"                = "job-bookmark-disable"
+      "--enable-auto-scaling"              = "true"
+      "--enable-metrics"                   = "true"
+      "--enable-continuous-cloudwatch-log" = "true"
+      "--enable-observability-metrics"     = "true"
+      "--continuous-log-logGroup"          = aws_cloudwatch_log_group.glue.name
+      "--job-bookmark-option"              = "job-bookmark-disable"
 
       # Spark UI event logs are useful when a job is slow, and cost only the S3 storage
       # the lifecycle rule already expires.
-      "--enable-spark-ui"           = "true"
-      "--spark-event-logs-path"     = "s3://${var.lake_bucket_id}/spark-logs/"
-      "--TempDir"                   = "s3://${var.lake_bucket_id}/glue-temp/"
+      "--enable-spark-ui"       = "true"
+      "--spark-event-logs-path" = "s3://${var.lake_bucket_id}/spark-logs/"
+      "--TempDir"               = "s3://${var.lake_bucket_id}/glue-temp/"
     },
     each.value.args,
   )
