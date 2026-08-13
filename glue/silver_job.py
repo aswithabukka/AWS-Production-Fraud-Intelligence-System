@@ -24,6 +24,7 @@ from datetime import UTC, datetime, timedelta
 from awsglue.context import GlueContext
 from awsglue.job import Job
 from awsglue.utils import getResolvedOptions
+from pyspark.conf import SparkConf
 from pyspark.context import SparkContext
 from pyspark.sql import functions as F
 
@@ -48,11 +49,16 @@ logger = get_logger("silver")
 def main() -> None:
     args = getResolvedOptions(sys.argv, REQUIRED_ARGS)
 
-    sc = SparkContext.getOrCreate()
+    # Iceberg's session extensions and catalog impl are STATIC Spark configs — they must
+    # exist before the SparkSession is created. Setting them afterwards via
+    # spark.conf.set() raises "Cannot modify the value of a static config" on Spark 3.5.
+    conf = SparkConf()
+    for key, value in iceberg_spark_conf(args["warehouse_uri"]).items():
+        conf.set(key, value)
+
+    sc = SparkContext.getOrCreate(conf)
     glue_context = GlueContext(sc)
     spark = glue_context.spark_session
-    for key, value in iceberg_spark_conf(args["warehouse_uri"]).items():
-        spark.conf.set(key, value)
 
     job = Job(glue_context)
     job.init(args["JOB_NAME"], args)
