@@ -48,9 +48,16 @@ resource "aws_s3vectors_index" "policies" {
   distance_metric = "cosine"
 
   metadata_configuration {
-    # Excluded from filterable metadata: the chunk text is large and is retrieved, not
-    # filtered on. Indexing it as filterable metadata inflates storage for no benefit.
-    non_filterable_metadata_keys = ["AMAZON_BEDROCK_TEXT"]
+    # S3 Vectors caps FILTERABLE metadata at 2048 bytes per vector, and Bedrock stores
+    # each chunk's full text in metadata — so every text-bearing key must be declared
+    # non-filterable or real documents fail ingestion at the cap. All three keys Bedrock
+    # writes are listed because the exact key name has shifted across KB releases;
+    # nothing in this project filters on metadata, so nothing is lost.
+    non_filterable_metadata_keys = [
+      "AMAZON_BEDROCK_TEXT",
+      "AMAZON_BEDROCK_TEXT_CHUNK",
+      "AMAZON_BEDROCK_METADATA",
+    ]
   }
 }
 

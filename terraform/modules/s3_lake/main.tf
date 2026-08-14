@@ -175,7 +175,8 @@ resource "aws_s3_object" "zone_placeholders" {
     "silver/",
     "gold/",
     "quarantine/",
-    "policies/",
+    # policies/ deliberately absent: the Knowledge Base ingests that whole prefix, and a
+    # placeholder object becomes a junk document in retrieval.
     "athena-results/",
   ])
 
