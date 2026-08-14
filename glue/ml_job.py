@@ -36,6 +36,7 @@ from glue.spark_utils import (
     merge_into,
 )
 from ml.ensemble import train_and_score
+from ml.feedback import apply_feedback
 
 REQUIRED_ARGS = [
     "JOB_NAME",
@@ -43,6 +44,8 @@ REQUIRED_ARGS = [
     "silver_table",
     "scores_table",
     "metrics_table",
+    "feedback_path",
+    "models_path",
 ]
 
 LOOKBACK_DAYS = 31
@@ -99,6 +102,23 @@ def main() -> None:
     pdf = silver.select(*needed).toPandas()
     logger.info("training on %s silver rows (dt >= %s)", len(pdf), cutoff)
 
+    # ------------------------------------------------------- label feedback loop
+    # Confirmed ground truth (chargeback outcomes, analyst decisions) lands under
+    # feedback/ as JSON lines. Every retrain folds it in, so the models track truth
+    # as it arrives rather than freezing at the first labels they saw.
+    feedback_pdf = None
+    try:
+        feedback_pdf = spark.read.json(args["feedback_path"].rstrip("/") + "/").toPandas()
+    except Exception:  # noqa: BLE001 - an empty/absent feedback prefix is the normal cold state
+        logger.info("no feedback found at %s — training on pipeline labels only", args["feedback_path"])
+    pdf, fb_stats = apply_feedback(pdf, feedback_pdf)
+    if fb_stats["feedback_rows"]:
+        logger.info(
+            "feedback applied: %s confirmations, %s labels changed by ground truth",
+            fb_stats["labels_confirmed"],
+            fb_stats["labels_changed"],
+        )
+
     result = train_and_score(pdf)
 
     trained_at = datetime.now(UTC)
@@ -120,6 +140,8 @@ def main() -> None:
     metrics["trained_at"] = trained_at
     metrics["model_run_id"] = run_stamp
     metrics["training_rows"] = len(pdf)
+    metrics["feedback_labels_confirmed"] = fb_stats["labels_confirmed"]
+    metrics["feedback_labels_changed"] = fb_stats["labels_changed"]
     metrics["fraud_rate_in_training_pct"] = round(100.0 * float(pdf["is_fraud"].mean()), 4)
     metrics_df = spark.createDataFrame(metrics)
 
@@ -140,8 +162,48 @@ def main() -> None:
             row.holdout_f1,
         )
 
+    _persist_models(result, args["models_path"], run_stamp)
     _emit_metrics(result)
     job.commit()
+
+
+def _persist_models(result, models_path: str, run_stamp: str) -> None:
+    """Serialise the fitted estimators to S3.
+
+    This is the seam for near-real-time scoring later: a Lambda or the API can load
+    latest/ and score a single event in milliseconds without retraining anything.
+    """
+    import json
+    import tempfile
+    from urllib.parse import urlparse
+
+    import boto3
+    import joblib
+
+    parsed = urlparse(models_path.rstrip("/"))
+    bucket, prefix = parsed.netloc, parsed.path.lstrip("/")
+    s3 = boto3.client("s3")
+
+    manifest = {
+        "model_run_id": run_stamp,
+        "threshold": result.threshold,
+        "feature_names": result.feature_names,
+        "models": {},
+    }
+    with tempfile.TemporaryDirectory() as tmp:
+        for name, model in result.fitted_models.items():
+            local = f"{tmp}/{name}.joblib"
+            joblib.dump(model, local)
+            key = f"{prefix}/{run_stamp}/{name}.joblib"
+            s3.upload_file(local, bucket, key)
+            manifest["models"][name] = key
+    s3.put_object(
+        Bucket=bucket,
+        Key=f"{prefix}/latest.json",
+        Body=json.dumps(manifest, indent=2).encode(),
+        ContentType="application/json",
+    )
+    logger.info("persisted %s models + manifest to %s", len(manifest["models"]), models_path)
 
 
 def _emit_metrics(result) -> None:

@@ -46,6 +46,8 @@ locals {
         "--silver_table"  = var.silver_table
         "--scores_table"  = var.scores_table
         "--metrics_table" = var.metrics_table
+        "--feedback_path" = "s3://${var.lake_bucket_id}/feedback"
+        "--models_path"   = "s3://${var.lake_bucket_id}/models"
         # Glue 5 SPARK jobs ship pandas/numpy but NOT scikit-learn (the Python-shell
         # runtime has it; the Spark runtime does not — learned from a live ImportError).
         "--additional-python-modules" = "scikit-learn==1.5.2,lightgbm==4.5.0,xgboost==2.1.1"

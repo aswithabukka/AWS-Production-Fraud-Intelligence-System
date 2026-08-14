@@ -89,6 +89,10 @@ class EnsembleResult:
 
     feature_names: list[str] = field(default_factory=list)
 
+    fitted_models: dict = field(default_factory=dict, repr=False)
+    """The trained estimators, keyed by model name — persisted to S3 by the job so a
+    future real-time scorer can load them without retraining."""
+
 
 def prepare_features(silver: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series]:
     """Silver rows -> (model matrix X, label y).
@@ -357,11 +361,16 @@ def train_and_score(
     if "dt" in silver:
         scores["dt"] = silver["dt"].values
 
+    fitted = dict(models)
+    fitted["isolation_forest"] = iforest
+    fitted["autoencoder"] = autoencoder
+
     return EnsembleResult(
         scores=scores,
         metrics=metrics,
         threshold=float(threshold),
         feature_names=list(X.columns),
+        fitted_models=fitted,
     )
 
 
