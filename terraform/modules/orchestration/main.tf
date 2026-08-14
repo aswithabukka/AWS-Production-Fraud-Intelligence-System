@@ -260,6 +260,7 @@ resource "aws_sfn_state_machine" "pipeline" {
     bronze_job_name             = var.glue_job_names["bronze"]
     silver_job_name             = var.glue_job_names["silver"]
     gold_job_name               = var.glue_job_names["gold"]
+    ml_job_name                 = var.glue_job_names["ml"]
     quality_job_name            = var.glue_job_names["quality"]
     bronze_table                = var.bronze_table
     silver_table                = var.silver_table

@@ -260,6 +260,38 @@
           "Next": "RecordGoldFailure"
         }
       ],
+      "Next": "RunModelJob"
+    },
+
+    "RunModelJob": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::glue:startJobRun.sync",
+      "Comment": "Trains the five-model ensemble on silver features and writes per-transaction fraud scores plus holdout metrics to gold.",
+      "Parameters": {
+        "JobName": "${ml_job_name}"
+      },
+      "ResultPath": null,
+      "Retry": [
+        {
+          "ErrorEquals": ["Glue.ConcurrentRunsExceededException", "Glue.InternalServiceException"],
+          "IntervalSeconds": 60,
+          "MaxAttempts": 3,
+          "BackoffRate": 2.0
+        },
+        {
+          "ErrorEquals": ["States.TaskFailed"],
+          "IntervalSeconds": 30,
+          "MaxAttempts": 1,
+          "BackoffRate": 2.0
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "ResultPath": "$.error",
+          "Next": "RecordModelFailure"
+        }
+      ],
       "Next": "RefreshKnowledgeBase"
     },
 
@@ -317,6 +349,17 @@
       "Parameters": {
         "failure_type": "glue_error",
         "stage": "silver",
+        "execution_arn.$": "$$.Execution.Id",
+        "error.$": "$.error"
+      },
+      "Next": "WriteFailureReport"
+    },
+
+    "RecordModelFailure": {
+      "Type": "Pass",
+      "Parameters": {
+        "failure_type": "glue_error",
+        "stage": "ml_ensemble",
         "execution_arn.$": "$$.Execution.Id",
         "error.$": "$.error"
       },

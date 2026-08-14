@@ -91,3 +91,20 @@ and the *bronze* Iceberg table evolves). Landing raw JSON keeps the raw zone
 schema-agnostic — the correct role for a raw zone — and makes bronze the first place schema
 is enforced. GZIP compression on the delivery stream keeps the storage cost the same order
 of magnitude.
+
+## D-012 — Model layer: five-model ensemble on Glue, not SageMaker
+**Rejected:** SageMaker (spec non-goal), always-on inference endpoints, a single model.
+The scoring stage trains LightGBM, XGBoost, RandomForest, an RBF-SVM, and an
+IsolationForest on silver features and averages them. Diversity is the point: four
+supervised learners with different inductive biases plus one unsupervised member that
+needs no labels at all — so the ensemble degrades gracefully if the label is ever wrong
+or missing. Training runs inside a Glue Spark job (the learning itself is sklearn on the
+driver — the dataset is portfolio-scale), which keeps the pricing shape per-request and
+the write path Iceberg like every other stage. Scores land in
+`gold.transaction_risk_scores` and holdout metrics in `gold.model_metrics`, both on the
+SQL agent's allowlist — "which model has the best AUC?" is now an answerable question.
+
+Honesty rule attached to this layer: silver features were engineered to catch exactly
+the fraud archetypes the generator injects, so holdout metrics validate the feature
+engineering, not real-world fraud performance. The threshold is chosen on the training
+split only; choosing it on holdout would leak the test set into the decision rule.

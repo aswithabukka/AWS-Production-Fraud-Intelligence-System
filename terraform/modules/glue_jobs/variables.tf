@@ -71,6 +71,16 @@ variable "merchant_risk_table" {
   default = "fraud_gold.merchant_risk"
 }
 
+variable "scores_table" {
+  type    = string
+  default = "fraud_gold.transaction_risk_scores"
+}
+
+variable "metrics_table" {
+  type    = string
+  default = "fraud_gold.model_metrics"
+}
+
 # ------------------------------------------------------------------- cost controls
 
 variable "glue_version" {

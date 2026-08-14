@@ -11,7 +11,12 @@ locals {
   # module needing its own relative-path arithmetic.
   source_root = abspath("${path.module}/../../..")
 
-  gold_tables = ["fraud_gold.fraud_metrics_daily", "fraud_gold.merchant_risk"]
+  gold_tables = [
+    "fraud_gold.fraud_metrics_daily",
+    "fraud_gold.merchant_risk",
+    "fraud_gold.transaction_risk_scores",
+    "fraud_gold.model_metrics",
+  ]
 
   model_arns = [
     for id in toset([var.routing_model_id, var.sql_model_id, var.synthesis_model_id]) :

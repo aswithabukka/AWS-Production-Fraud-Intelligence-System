@@ -10,7 +10,8 @@ producer ─▶ Kinesis (on-demand) ─▶ Firehose ─▶ S3 raw/            [s
                                                  │
                                     Glue 5.x PySpark (Iceberg)     [slice 1b]
                                                  │
-                          bronze ──▶ silver ──▶ gold               Glue Catalog / Athena
+                bronze ──▶ silver ──▶ gold ──▶ ML ensemble        Glue Catalog / Athena
+                                        (LGBM·XGB·RF·SVM·iForest → risk scores)
                              │          │
                          quarantine   DQDL quality gates
                                                  │
@@ -79,6 +80,7 @@ except EKS running. The rules that keep it there:
 ```
 ingestion/       producer + generator (3 injectable fraud archetypes)
 glue/            PySpark transforms (pure functions) + job entry points
+ml/              five-model fraud-scoring ensemble (pure sklearn, locally tested)
 quality/         DQDL rulesets + quality gate job
 orchestration/   Step Functions ASL + 4 Lambdas
 agents/          SQL validator, Bedrock client, catalog cache, LangGraph supervisor

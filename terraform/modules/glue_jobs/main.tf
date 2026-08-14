@@ -39,6 +39,17 @@ locals {
         "--merchant_risk_table" = var.merchant_risk_table
       }
     }
+    ml = {
+      script  = "ml_job.py"
+      timeout = var.job_timeout_minutes
+      args = {
+        "--silver_table"  = var.silver_table
+        "--scores_table"  = var.scores_table
+        "--metrics_table" = var.metrics_table
+        # sklearn/pandas ship with Glue 5; the boosters do not.
+        "--additional-python-modules" = "lightgbm==4.5.0,xgboost==2.1.1"
+      }
+    }
     quality = {
       script  = "quality_job.py"
       timeout = var.job_timeout_minutes
@@ -69,6 +80,8 @@ resource "aws_s3_object" "scripts" {
   key    = "artifacts/glue/scripts/${each.value.script}"
   source = "${var.source_root}/${each.key == "quality" ? "quality" : "glue"}/${each.value.script}"
   etag   = filemd5("${var.source_root}/${each.key == "quality" ? "quality" : "glue"}/${each.value.script}")
+  # (the ml job's entry script lives in glue/ like the others; its library code in ml/
+  # travels inside the shared libs zip)
 }
 
 # --------------------------------------------------------------------------- IAM

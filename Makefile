@@ -43,7 +43,7 @@ mcp-local: ## Run the MCP server locally (stdio)
 
 package: ## Build dist/glue_libs.zip (required before terraform plan)
 	rm -rf dist && mkdir -p dist
-	cd . && zip -qr dist/glue_libs.zip glue quality \
+	cd . && zip -qr dist/glue_libs.zip glue quality ml \
 		-x '*__pycache__*' -x '*.pyc'
 	@echo "built dist/glue_libs.zip ($$(du -h dist/glue_libs.zip | cut -f1))"
 
@@ -104,6 +104,9 @@ seed: ## Run the producer against the live Kinesis stream (60s, ~50 eps)
 seed-local: ## Generate events to stdout — no AWS, no cost
 	./.venv/bin/python -m ingestion.producer --duration 5 --rate 10 --dry-run
 
+train: ## Run the ML ensemble job on current silver data
+	aws glue start-job-run --job-name fraud-lake-ml --profile $(AWS_PROFILE) --no-cli-pager
+
 run-pipeline: ## Start one Step Functions execution by hand
 	aws stepfunctions start-execution \
 		--state-machine-arn $$($(TF) output -raw state_machine_arn) \
@@ -111,4 +114,4 @@ run-pipeline: ## Start one Step Functions execution by hand
 		--profile $(AWS_PROFILE) --no-cli-pager
 
 .PHONY: help venv lint fmt test api-local mcp-local package init plan apply destroy output \
-        stream-down stream-up demo-up demo-down cost eks-destroy seed seed-local run-pipeline
+        stream-down stream-up demo-up demo-down cost eks-destroy seed seed-local run-pipeline train

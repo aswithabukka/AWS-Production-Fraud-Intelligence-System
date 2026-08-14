@@ -65,6 +65,8 @@ class AgentConfig:
     gold_tables: tuple[str, ...] = (
         "fraud_gold.fraud_metrics_daily",
         "fraud_gold.merchant_risk",
+        "fraud_gold.transaction_risk_scores",
+        "fraud_gold.model_metrics",
     )
     max_rows_returned: int = field(default_factory=lambda: _env_int("MAX_ROWS_RETURNED", 200))
 
