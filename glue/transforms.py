@@ -451,8 +451,16 @@ def build_fraud_metrics_daily(silver: DataFrame) -> DataFrame:
         )
         .withColumn(
             "fraud_loss_rate_pct",
+            # NULL when there was no volume, expressed with when() rather than
+            # F.nullif(): Glue 5's Spark build rejects nullif over unresolved columns
+            # ("Invalid call to dataType on unresolved object") even though stock
+            # PySpark 3.5 accepts it — found on the first live gold run.
             F.round(
-                100.0 * F.col("fraud_loss_amount_usd") / F.nullif(F.col("total_amount_usd"), F.lit(0.0)), 4
+                F.when(
+                    F.col("total_amount_usd") > 0,
+                    100.0 * F.col("fraud_loss_amount_usd") / F.col("total_amount_usd"),
+                ),
+                4,
             ),
         )
         .withColumn("gold_computed_at", F.current_timestamp())
