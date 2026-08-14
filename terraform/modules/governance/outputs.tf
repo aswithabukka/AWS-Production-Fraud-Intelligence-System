@@ -7,8 +7,11 @@ output "risk_analyst_role_arn" {
 }
 
 output "analyst_excluded_columns" {
-  description = "The columns the persona demo shows disappearing."
-  value       = var.analyst_excluded_columns
+  description = "The columns the persona demo shows disappearing, per table."
+  value = {
+    fraud_metrics_daily = var.metrics_excluded_columns
+    merchant_risk       = var.risk_excluded_columns
+  }
 }
 
 output "cloudtrail_bucket" {

@@ -15,8 +15,12 @@
 resource "aws_lakeformation_resource" "lake" {
   count = var.enable_lake_formation ? 1 : 0
 
-  arn      = "${var.lake_bucket_arn}/warehouse"
-  role_arn = var.lake_formation_service_role_arn
+  # The gold data actually lives under gold/, and credential vending only works for
+  # registered locations. Hybrid access keeps plain-IAM paths (the Glue jobs, the
+  # agent's Athena queries) working alongside Lake Formation vending.
+  arn                   = "${var.lake_bucket_arn}/gold"
+  role_arn              = var.lake_formation_service_role_arn
+  hybrid_access_enabled = true
 }
 
 # --------------------------------------------------------------------- personas
@@ -116,9 +120,11 @@ resource "aws_lakeformation_permissions" "analyst_metrics" {
   permissions = ["SELECT"]
 
   table_with_columns {
-    database_name         = var.gold_database
-    name                  = var.fraud_metrics_table
-    excluded_column_names = var.analyst_excluded_columns
+    database_name = var.gold_database
+    name          = var.fraud_metrics_table
+    # "every column except these" — exclusions apply against the wildcard.
+    wildcard              = true
+    excluded_column_names = var.metrics_excluded_columns
   }
 }
 
@@ -131,7 +137,8 @@ resource "aws_lakeformation_permissions" "analyst_merchant_risk" {
   table_with_columns {
     database_name         = var.gold_database
     name                  = var.merchant_risk_table
-    excluded_column_names = var.analyst_excluded_columns
+    wildcard              = true
+    excluded_column_names = var.risk_excluded_columns
   }
 }
 

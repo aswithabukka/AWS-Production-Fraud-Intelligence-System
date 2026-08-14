@@ -35,18 +35,20 @@ variable "merchant_risk_table" {
   default = "merchant_risk"
 }
 
-variable "analyst_excluded_columns" {
-  description = <<-EOT
-    Columns the `analyst` persona may not see, enforced at the catalog rather than by
-    query convention. These are the cardholder-identifying and investigation-only fields;
-    the exclusion holds even for `SELECT *`.
-  EOT
+# Columns the `analyst` persona may not see, enforced at the catalog rather than by
+# query convention — the exclusion holds even for `SELECT *`. Per-table lists because
+# Lake Formation rejects a grant that excludes a column the table does not have.
+
+variable "metrics_excluded_columns" {
+  description = "Excluded from analyst on fraud_metrics_daily."
   type        = list(string)
-  default = [
-    "distinct_customer_count",
-    "total_fraud_signals",
-    "merchant_risk_score",
-  ]
+  default     = ["distinct_customer_count", "total_fraud_signals"]
+}
+
+variable "risk_excluded_columns" {
+  description = "Excluded from analyst on merchant_risk."
+  type        = list(string)
+  default     = ["distinct_customer_count", "merchant_risk_score"]
 }
 
 variable "enable_lake_formation" {
