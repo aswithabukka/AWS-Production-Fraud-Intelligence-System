@@ -113,9 +113,11 @@ Rules = [
     IsComplete "merchant_risk_score",
     ColumnValues "merchant_risk_tier" in ["low", "medium", "high", "unknown"],
 
-    # Geo distance is NULL for a customer's first transaction — a large share of a
-    # young table (every customer starts somewhere), shrinking as history accumulates.
-    ColumnValues "geo_distance_from_prior_km" >= 0 with threshold >= 0.60,
+    # Geo distance is legitimately NULL for a customer's first transaction, and DQDL
+    # fails NULLs in a ColumnValues rule outright — the threshold clause does not
+    # rescue them (learned live). The actual invariant is that a distance, when
+    # present, is never negative.
+    CustomSql "SELECT COUNT(*) FROM primary WHERE geo_distance_from_prior_km < 0" = 0,
 
     IsComplete "fraud_signal_count",
     # DQDL `between` excludes its boundaries; -1..5 means the inclusive 0..4.
