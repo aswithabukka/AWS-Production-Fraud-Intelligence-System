@@ -8,6 +8,8 @@ crash.log
 crash.*.log
 *.tfvars
 !*.tfvars.example
+backend.hcl
+!backend.hcl.example
 .terraform.lock.hcl
 
 # python

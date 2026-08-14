@@ -8,13 +8,8 @@ terraform {
     }
   }
 
-  # Remote state, created by terraform/bootstrap. Per-request priced — cents a year.
-  backend "s3" {
-    bucket         = "fraud-lake-tfstate-434661699277"
-    key            = "envs/dev/terraform.tfstate"
-    region         = "us-east-1"
-    profile        = "fraud-lake"
-    dynamodb_table = "fraud-lake-tflock"
-    encrypt        = true
-  }
+  # Remote state, created by terraform/bootstrap. Values live in backend.hcl
+  # (gitignored — it carries the account id): terraform init -backend-config=backend.hcl
+  # Copy backend.hcl.example and fill in your account id.
+  backend "s3" {}
 }

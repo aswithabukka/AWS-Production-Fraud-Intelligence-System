@@ -1,0 +1,6 @@
+bucket         = "fraud-lake-tfstate-<your-account-id>"
+key            = "envs/dev/terraform.tfstate"
+region         = "us-east-1"
+profile        = "fraud-lake"
+dynamodb_table = "fraud-lake-tflock"
+encrypt        = true

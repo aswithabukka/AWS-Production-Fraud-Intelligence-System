@@ -49,8 +49,8 @@ package: ## Build dist/glue_libs.zip (required before terraform plan)
 
 # ---------------------------------------------------------------- terraform
 
-init: ## terraform init
-	$(TF) init
+init: ## terraform init (backend values from backend.hcl)
+	$(TF) init -backend-config=backend.hcl
 
 plan: package ## terraform plan (ALWAYS run before apply)
 	$(TF) plan -out=tfplan
