@@ -37,11 +37,11 @@ resource "aws_lakeformation_resource" "lake" {
   count = var.enable_lake_formation ? 1 : 0
 
   # The gold data actually lives under gold/, and credential vending only works for
-  # registered locations. Hybrid access keeps plain-IAM paths (the Glue jobs, the
-  # agent's Athena queries) working alongside Lake Formation vending.
-  arn                   = "${var.lake_bucket_arn}/gold"
-  role_arn              = var.lake_formation_service_role_arn
-  hybrid_access_enabled = true
+  # registered locations. Standard (non-hybrid) mode so Athena vends credentials for
+  # any LF-permitted principal without per-principal opt-ins. Registration does not
+  # block direct S3 IAM access, so the Glue jobs' writes are unaffected.
+  arn      = "${var.lake_bucket_arn}/gold"
+  role_arn = var.lake_formation_service_role_arn
 }
 
 # --------------------------------------------------------------------- personas
@@ -163,6 +163,36 @@ resource "aws_lakeformation_permissions" "analyst_merchant_risk" {
     name                  = var.merchant_risk_table
     wildcard              = true
     excluded_column_names = var.risk_excluded_columns
+  }
+}
+
+# The pipeline itself: once IAMAllowedPrincipals is revoked from the gold tables,
+# catalog operations on them are LF-checked for every principal — including the Glue
+# role that rewrites them each run. Explicit ALL keeps the gold job working.
+resource "aws_lakeformation_permissions" "glue_gold" {
+  for_each = var.enable_lake_formation ? toset([var.fraud_metrics_table, var.merchant_risk_table]) : toset([])
+
+  depends_on  = [aws_lakeformation_data_lake_settings.main]
+  principal   = var.glue_role_arn
+  permissions = ["ALL"]
+
+  table {
+    database_name = var.gold_database
+    name          = each.value
+  }
+}
+
+# The agent's task role (used when the API runs on ECS rather than as the admin user).
+resource "aws_lakeformation_permissions" "agent_gold" {
+  for_each = var.enable_lake_formation && var.agent_role_arn != "" ? toset([var.fraud_metrics_table, var.merchant_risk_table]) : toset([])
+
+  depends_on  = [aws_lakeformation_data_lake_settings.main]
+  principal   = var.agent_role_arn
+  permissions = ["SELECT"]
+
+  table {
+    database_name = var.gold_database
+    name          = each.value
   }
 }
 

@@ -196,6 +196,8 @@ module "governance" {
   # The identity running terraform becomes the LF data lake administrator —
   # session context resolves an assumed-role session back to the role ARN.
   lake_formation_admin_arn = data.aws_iam_session_context.current.issuer_arn
+  glue_role_arn            = module.glue.role_arn
+  agent_role_arn           = try(module.bedrock[0].agent_role_arn, "")
 
   name_prefix     = var.name_prefix
   region          = var.region

@@ -92,3 +92,15 @@ variable "lake_formation_admin_arn" {
   type        = string
   default     = ""
 }
+
+variable "glue_role_arn" {
+  description = "Glue job role — needs explicit LF ALL on gold tables once defaults are revoked."
+  type        = string
+  default     = ""
+}
+
+variable "agent_role_arn" {
+  description = "Agent task role — SELECT on gold tables. Empty when the agent layer is off."
+  type        = string
+  default     = ""
+}
