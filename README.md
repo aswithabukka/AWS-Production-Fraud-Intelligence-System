@@ -31,15 +31,16 @@ producer ─▶ Kinesis (on-demand) ─▶ Firehose ─▶ S3 raw/            [s
 
 | Slice | Scope | State |
 |---|---|---|
-| 1a | Ingestion + raw landing | ✅ code complete |
-| 1b | Glue + Iceberg + data quality | ✅ code complete |
-| 1c | Orchestration + failure scenarios | ✅ code complete |
-| 2 | Agent layer (LangGraph, MCP, FastAPI) | ✅ code complete |
-| 3 | Packaging (Docker, ECS, EKS, governance, CI) | ✅ code complete |
+| 1a | Ingestion + raw landing | ✅ **deployed & verified** |
+| 1b | Glue + Iceberg + data quality | ✅ **deployed & verified** |
+| 1c | Orchestration + all 3 failure scenarios | ✅ **deployed & executed** |
+| 2 | Agent layer (LangGraph, MCP, FastAPI) | ✅ **deployed — definition-of-done met** |
+| 3 | Governance (Lake Formation personas, CloudTrail) | ✅ **deployed & demoed** |
+| 3 | Containers (ECR/Fargate) · EKS demo · GitHub CI | ⬜ code complete, awaiting Docker install / demo window |
 
-**No `terraform apply` has been run.** All 142 tests pass locally with no AWS credentials.
-The apply order and verification steps are in [docs/slice-1a-runbook.md](docs/slice-1a-runbook.md)
-and [docs/failure-scenarios.md](docs/failure-scenarios.md).
+**Everything above ran against a live AWS account.** The measured results — including
+the seven diagnosed failures before the first green run, and the numbers for every
+failure scenario — are in [docs/as-run-results.md](docs/as-run-results.md).
 
 ## Try it now, with no AWS account
 
