@@ -106,9 +106,10 @@ data "aws_iam_policy_document" "persona_base" {
   }
 
   statement {
-    sid       = "AthenaResults"
-    effect    = "Allow"
-    actions   = ["s3:GetObject", "s3:PutObject", "s3:ListBucket"]
+    sid    = "AthenaResults"
+    effect = "Allow"
+    # GetBucketLocation is required: Athena verifies the results bucket before running.
+    actions   = ["s3:GetObject", "s3:PutObject", "s3:ListBucket", "s3:GetBucketLocation"]
     resources = [var.lake_bucket_arn, "${var.lake_bucket_arn}/athena-results/*"]
   }
 }
