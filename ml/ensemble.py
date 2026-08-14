@@ -212,7 +212,7 @@ class _Autoencoder:
         recon = self.net.predict(Z)
         return np.mean((Z - recon) ** 2, axis=1)
 
-    def fit(self, X_legit: pd.DataFrame) -> "_Autoencoder":
+    def fit(self, X_legit: pd.DataFrame) -> _Autoencoder:
         import warnings
 
         from sklearn.exceptions import ConvergenceWarning
