@@ -111,7 +111,7 @@ make plan
 make apply     # it asks you to type 'apply' — that's the cost-control speed bump
 ```
 
-First applies fail sometimes on a provider-schema nit — paste the error to Claude Code
+First applies fail sometimes on a provider-schema nit — paste the error to the build tooling
 and re-plan. That's normal, not a sign something is broken.
 
 ### Console tour — walk the data path you just built

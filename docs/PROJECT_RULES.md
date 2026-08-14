@@ -1,4 +1,4 @@
-# fraud-lake — project rules
+# fraud-lake — project rules & conventions
 
 An AWS streaming lakehouse with an agentic analytics layer, built as a portfolio project
 for AI Data Engineer roles. Domain: synthetic card-transaction fraud analytics.

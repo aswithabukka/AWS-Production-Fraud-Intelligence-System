@@ -39,3 +39,6 @@ data/
 .DS_Store
 .idea/
 .vscode/
+
+# local session config
+CLAUDE.md

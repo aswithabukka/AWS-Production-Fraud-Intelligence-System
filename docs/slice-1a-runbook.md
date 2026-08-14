@@ -1,7 +1,7 @@
 # Slice 1a runbook — ingestion + raw landing
 
-Everything below is run by you. Claude Code does not run `terraform apply` or any
-mutating `aws` command.
+Everything below is run by hand — no automation runs `terraform apply` or any
+mutating `aws` command unreviewed.
 
 ## 0. Prerequisites (once)
 
