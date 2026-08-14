@@ -46,8 +46,9 @@ locals {
         "--silver_table"  = var.silver_table
         "--scores_table"  = var.scores_table
         "--metrics_table" = var.metrics_table
-        # sklearn/pandas ship with Glue 5; the boosters do not.
-        "--additional-python-modules" = "lightgbm==4.5.0,xgboost==2.1.1"
+        # Glue 5 SPARK jobs ship pandas/numpy but NOT scikit-learn (the Python-shell
+        # runtime has it; the Spark runtime does not — learned from a live ImportError).
+        "--additional-python-modules" = "scikit-learn==1.5.2,lightgbm==4.5.0,xgboost==2.1.1"
       }
     }
     quality = {
