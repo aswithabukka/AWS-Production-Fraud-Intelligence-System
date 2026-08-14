@@ -9,3 +9,9 @@ fastapi==0.115.*
 uvicorn[standard]==0.32.*
 pydantic==2.9.*
 mcp>=1.2
+# real-time scoring: load and run the persisted ensemble
+scikit-learn==1.5.*
+lightgbm==4.5.*
+xgboost==2.1.*
+pandas==2.2.*
+joblib==1.4.*

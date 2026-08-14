@@ -40,7 +40,7 @@ def test_ask_returns_the_full_answer_envelope(client, monkeypatch):
     monkeypatch.setattr(
         api_main,
         "ask",
-        lambda question: {
+        lambda question, **kwargs: {
             "question": question,
             "answer": "Fraud rate was 1.5%.",
             "tools_used": ["query_lakehouse"],
@@ -75,7 +75,7 @@ def test_ask_rejects_an_oversized_question(client):
 
 
 def test_ask_surfaces_graph_failures_as_500(client, monkeypatch):
-    def explode(_question):
+    def explode(_question, **_kwargs):
         raise RuntimeError("bedrock unavailable")
 
     monkeypatch.setattr(api_main, "ask", explode)

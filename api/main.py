@@ -35,6 +35,8 @@ from api.models import (
     AskRequest,
     AskResponse,
     HealthResponse,
+    ScoreRequest,
+    ScoreResponse,
     SqlCheckRequest,
     SqlCheckResponse,
 )
@@ -118,7 +120,7 @@ def ask_endpoint(request: AskRequest) -> AskResponse:
     _counters["requests"] += 1
 
     try:
-        result = ask(request.question)
+        result = ask(request.question, conversation_id=request.conversation_id)
     except Exception as exc:  # noqa: BLE001
         _counters["errors"] += 1
         logger.exception("graph invocation failed")
@@ -179,6 +181,28 @@ def ask_stream(request: AskRequest) -> StreamingResponse:
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+@app.post("/score", response_model=ScoreResponse)
+def score(request: ScoreRequest) -> ScoreResponse:
+    """Score a single event in real time against the persisted ensemble.
+
+    No Glue, no retraining: the six fitted models load from S3 (cached ~10 min) and a
+    score takes milliseconds. History features come from the DynamoDB feature store
+    when available; the models treat genuinely absent history as its own signal.
+    """
+    from api.scoring import get_scoring_service
+
+    _counters["scores"] += 1
+    try:
+        result = get_scoring_service().score(request.model_dump(exclude_none=True))
+    except Exception as exc:  # noqa: BLE001
+        _counters["score_errors"] += 1
+        logger.exception("scoring failed")
+        raise HTTPException(status_code=500, detail=f"scoring failed: {exc}") from exc
+    if result["predicted_is_fraud"]:
+        _counters["scores_flagged"] += 1
+    return ScoreResponse(**result)
 
 
 @app.post("/sql/check", response_model=SqlCheckResponse)

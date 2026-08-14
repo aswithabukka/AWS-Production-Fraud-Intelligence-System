@@ -78,6 +78,21 @@ module "ingest" {
   log_retention_days      = var.log_retention_days
 }
 
+# ---------------------------------------------------------------------------------
+# Online feature store: only exists alongside the stream it consumes; per-request
+# pricing throughout, so it costs nothing between demo sessions.
+
+module "feature_store" {
+  source = "../../modules/feature_store"
+  count  = var.enable_stream ? 1 : 0
+
+  name_prefix = var.name_prefix
+  region      = var.region
+  account_id  = local.account_id
+  source_root = local.source_root
+  stream_arn  = module.ingest[0].stream_arn
+}
+
 # ============================================================ SLICE 1b: Glue + Iceberg
 # Per-request. A Glue job that never runs bills nothing, so these are safe to define.
 # Requires `make package` first — the module uploads the library archive it builds.
@@ -192,6 +207,8 @@ module "ecs" {
     SQL_MODEL_ID           = var.sql_model_id
     SYNTHESIS_MODEL_ID     = var.synthesis_model_id
     MAX_ITERATIONS         = tostring(var.max_iterations)
+    MODELS_URI             = "s3://${module.lake.bucket_id}/models"
+    FEATURES_TABLE         = try(module.feature_store[0].table_name, "")
   }
 }
 
@@ -218,6 +235,7 @@ module "governance" {
 module "observability" {
   source = "../../modules/observability"
 
+  alerts_topic_arn  = module.orchestration.alerts_topic_arn
   name_prefix       = var.name_prefix
   region            = var.region
   state_machine_arn = module.orchestration.state_machine_arn

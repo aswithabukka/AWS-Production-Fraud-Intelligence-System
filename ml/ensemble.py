@@ -254,11 +254,21 @@ def train_and_score(
     silver: pd.DataFrame,
     test_size: float = 0.25,
     seed: int = RANDOM_SEED,
+    split: str = "random",
+    false_positive_cost: float | None = None,
+    false_negative_cost: float | None = None,
 ) -> EnsembleResult:
-    """Train all five models, evaluate on a stratified holdout, score every input row.
+    """Train all models, evaluate on a holdout, score every input row.
 
-    Returns scores for the FULL input frame (train + holdout alike — the pipeline wants
-    a score on every transaction), while metrics are computed on holdout rows only.
+    `split="temporal"` trains on the past and tests on the future (ordered by
+    transaction time) — the methodologically honest evaluation for fraud, since random
+    splits let the model peek at the future of the very customers it is tested on.
+    Falls back to random when no usable time column exists.
+
+    If both costs are given, the decision threshold minimises expected cost
+    (missed_fraud × fn_cost + false_alarm × fp_cost) on the TRAINING split instead of
+    maximising F1 — which is how real fraud teams set thresholds, because a missed
+    $2,000 fraud and a 30-second analyst review are not symmetric mistakes.
     """
     if len(silver) < 200:
         raise ValueError(f"need at least 200 rows to train, got {len(silver)}")
@@ -266,9 +276,24 @@ def train_and_score(
     if y.nunique() < 2:
         raise ValueError("label has a single class — cannot train supervised models")
 
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=test_size, stratify=y, random_state=seed
+    time_col = next(
+        (c for c in ("transaction_timestamp", "dt") if c in silver and silver[c].nunique() > 1), None
     )
+    if split == "temporal" and time_col is not None:
+        order = silver[time_col].argsort(kind="stable")
+        cut = int(len(order) * (1 - test_size))
+        train_idx, test_idx = X.index[order[:cut]], X.index[order[cut:]]
+        X_train, X_test = X.loc[train_idx], X.loc[test_idx]
+        y_train, y_test = y.loc[train_idx], y.loc[test_idx]
+        if y_train.nunique() < 2 or y_test.nunique() < 2:
+            # Degenerate period (e.g. no fraud yet in the early window) — fall back.
+            X_train, X_test, y_train, y_test = train_test_split(
+                X, y, test_size=test_size, stratify=y, random_state=seed
+            )
+    else:
+        X_train, X_test, y_train, y_test = train_test_split(
+            X, y, test_size=test_size, stratify=y, random_state=seed
+        )
 
     pos = max(int(y_train.sum()), 1)
     scale_pos_weight = (len(y_train) - pos) / pos
@@ -317,7 +342,15 @@ def train_and_score(
     # Threshold chosen on TRAIN (best F1 over a sweep), evaluated on holdout — choosing
     # it on the holdout would quietly leak the test set into the decision rule.
     train_mask = X.index.isin(X_train.index)
-    threshold = _best_f1_threshold(y[train_mask].to_numpy(), ensemble_full[train_mask])
+    if false_positive_cost is not None and false_negative_cost is not None:
+        threshold = _min_cost_threshold(
+            y[train_mask].to_numpy(),
+            ensemble_full[train_mask],
+            false_positive_cost,
+            false_negative_cost,
+        )
+    else:
+        threshold = _best_f1_threshold(y[train_mask].to_numpy(), ensemble_full[train_mask])
 
     # 5-fold cross-validated AUC on the TRAINING split for the fast supervised models —
     # evidence that performance is stable across splits, not a lucky holdout. The SVM is
@@ -343,6 +376,17 @@ def train_and_score(
     metrics_rows.append(ens_row)
     metrics = pd.DataFrame(metrics_rows)
 
+    # Per-row top risk factors from LightGBM's native prediction contributions
+    # (pred_contrib — SHAP-style attributions with zero extra dependencies). The three
+    # most score-raising features, human-readable: the "why" next to every score.
+    contrib = models["lightgbm"].predict(X, pred_contrib=True)[:, :-1]  # drop bias term
+    top3_idx = np.argsort(-contrib, axis=1)[:, :3]
+    feature_arr = np.array(X.columns)
+    top_factors = [
+        ", ".join(f"{feature_arr[j]}" for j in row if contrib[i, j] > 0) or "none"
+        for i, row in enumerate(top3_idx)
+    ]
+
     scores = pd.DataFrame(
         {
             "transaction_id": silver["transaction_id"].values,
@@ -354,6 +398,7 @@ def train_and_score(
             "autoencoder_reconstruction_score": np.round(proba_full["autoencoder"], 6),
             "ensemble_fraud_score": np.round(ensemble_full, 6),
             "predicted_is_fraud": ensemble_full >= threshold,
+            "top_risk_factors": top_factors,
             "actual_is_fraud": y.astype(bool).values,
             "in_holdout": ~train_mask,
         }
@@ -372,6 +417,19 @@ def train_and_score(
         feature_names=list(X.columns),
         fitted_models=fitted,
     )
+
+
+def _min_cost_threshold(y_true: np.ndarray, scores: np.ndarray, fp_cost: float, fn_cost: float) -> float:
+    """Threshold minimising expected business cost on the training split."""
+    best_t, best_cost = 0.5, float("inf")
+    for t in np.linspace(0.05, 0.95, 91):
+        preds = scores >= t
+        cost = fp_cost * float(((preds == 1) & (y_true == 0)).sum()) + fn_cost * float(
+            ((preds == 0) & (y_true == 1)).sum()
+        )
+        if cost < best_cost:
+            best_t, best_cost = float(t), cost
+    return best_t
 
 
 def _best_f1_threshold(y_true: np.ndarray, scores: np.ndarray) -> float:

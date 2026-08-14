@@ -367,6 +367,20 @@ data "aws_iam_policy_document" "agent" {
   }
 
   statement {
+    sid       = "ReadModelBundle"
+    effect    = "Allow"
+    actions   = ["s3:GetObject"]
+    resources = ["${var.lake_bucket_arn}/models/*"]
+  }
+
+  statement {
+    sid       = "ReadOnlineFeatures"
+    effect    = "Allow"
+    actions   = ["dynamodb:GetItem"]
+    resources = ["arn:aws:dynamodb:${var.region}:${var.account_id}:table/${var.name_prefix}-customer-features"]
+  }
+
+  statement {
     sid       = "WriteAthenaResults"
     effect    = "Allow"
     actions   = ["s3:PutObject", "s3:GetObject"]

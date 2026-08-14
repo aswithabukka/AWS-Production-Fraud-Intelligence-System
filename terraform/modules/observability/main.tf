@@ -11,6 +11,23 @@ locals {
   agent_ns    = "fraud-lake/agent"
 }
 
+# Drift alarm: a training run whose holdout AUC lands below the floor is a model that
+# stopped understanding the data — page a human before its scores go anywhere.
+resource "aws_cloudwatch_metric_alarm" "model_drift" {
+  alarm_name          = "${var.name_prefix}-model-drift"
+  alarm_description   = "Ensemble holdout AUC fell below 0.80 on the latest training run."
+  namespace           = "fraud-lake/ml"
+  metric_name         = "EnsembleHoldoutAUC"
+  statistic           = "Minimum"
+  period              = 3600
+  evaluation_periods  = 1
+  threshold           = 0.8
+  comparison_operator = "LessThanThreshold"
+  treat_missing_data  = "notBreaching" # no training run this hour is not drift
+
+  alarm_actions = [var.alerts_topic_arn]
+}
+
 resource "aws_cloudwatch_dashboard" "main" {
   dashboard_name = var.name_prefix
 
@@ -200,6 +217,26 @@ resource "aws_cloudwatch_dashboard" "main" {
               label = "MAX_ITERATIONS — sustained contact here means the router is looping"
               value = var.max_iterations
             }]
+          }
+        }
+      },
+      {
+        type = "metric"
+        x    = 0, y = 30, width = 12, height = 6
+        properties = {
+          title  = "Model drift — ensemble holdout AUC per training run"
+          region = var.region
+          view   = "timeSeries"
+          stat   = "Average"
+          period = 3600
+          metrics = [
+            ["fraud-lake/ml", "EnsembleHoldoutAUC", { label = "ensemble AUC" }],
+            [".", "EnsembleHoldoutF1", { label = "ensemble F1" }],
+            [".", "EnsembleDecisionThreshold", { label = "decision threshold" }],
+          ]
+          yAxis = { left = { min = 0, max = 1 } }
+          annotations = {
+            horizontal = [{ label = "drift alarm floor", value = 0.8 }]
           }
         }
       },

@@ -92,8 +92,16 @@ def main() -> None:
     logger.info("wrote %s rows to %s", risk.count(), risk_table)
 
     # COST + performance: every Iceberg snapshot pins its data files in S3. Without
-    # expiry the footprint only grows, however much data is logically replaced.
-    for table in (metrics_table, risk_table):
+    # expiry the footprint only grows, however much data is logically replaced. Gold is
+    # the natural home for lake-wide maintenance: it runs last, after every writer.
+    maintenance_tables = (
+        metrics_table,
+        risk_table,
+        f"{CATALOG}.fraud_bronze.transactions",
+        f"{CATALOG}.fraud_silver.transactions",
+        f"{CATALOG}.fraud_silver.merchant_dim",
+    )
+    for table in maintenance_tables:
         try:
             expire_old_snapshots(spark, table, retain_days=7)
         except Exception as exc:  # noqa: BLE001 - maintenance must never fail the job

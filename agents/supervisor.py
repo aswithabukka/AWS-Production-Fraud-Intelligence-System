@@ -122,9 +122,14 @@ def _parse_route(text: str) -> dict[str, Any]:
     }
 
 
-def build_supervisor(client: BedrockClient | None = None, config: AgentConfig | None = None):
+def build_supervisor(
+    client: BedrockClient | None = None,
+    config: AgentConfig | None = None,
+    checkpointer=None,
+):
     """Compile the graph. `client` is injectable so the routing logic can be tested
-    without Bedrock credentials."""
+    without Bedrock credentials. Pass a LangGraph checkpointer to enable multi-turn
+    conversation memory keyed by thread_id."""
     config = config or get_config()
     client = client or BedrockClient(config)
 
@@ -257,7 +262,7 @@ def build_supervisor(client: BedrockClient | None = None, config: AgentConfig | 
     graph.add_edge("call_tool", "route_query")
     graph.add_edge("synthesize", END)
 
-    return graph.compile()
+    return graph.compile(checkpointer=checkpointer)
 
 
 # ------------------------------------------------------------------------ formatting
@@ -317,13 +322,42 @@ def _format_results_for_synthesis(results: list[dict[str, Any]]) -> str:
     return "\n\n---\n\n".join(blocks)
 
 
-def ask(question: str, client: BedrockClient | None = None) -> dict[str, Any]:
+_MEMORY = None
+_MEMORY_GRAPHS: dict[int, Any] = {}
+
+
+def _conversational_graph(client: BedrockClient):
+    """A process-lifetime checkpointer so follow-up questions ("and compared to last
+    week?") carry prior tool results as context, keyed by conversation_id. In-memory by
+    design: conversation history is ephemeral UX state, not data — losing it on restart
+    is correct, cheap, and private."""
+    global _MEMORY
+    if _MEMORY is None:
+        from langgraph.checkpoint.memory import MemorySaver
+
+        _MEMORY = MemorySaver()
+    return build_supervisor(client=client, checkpointer=_MEMORY)
+
+
+def ask(
+    question: str,
+    client: BedrockClient | None = None,
+    conversation_id: str | None = None,
+) -> dict[str, Any]:
     """Convenience entry point used by the API and the MCP server."""
     client = client or BedrockClient()
-    graph = build_supervisor(client=client)
+    if conversation_id:
+        graph = _conversational_graph(client)
+        invoke_config = {"configurable": {"thread_id": conversation_id}}
+    else:
+        graph = build_supervisor(client=client)
+        invoke_config = None
 
     started = time.perf_counter()
-    final = graph.invoke({"question": question, "iterations": 0})
+    final = graph.invoke(
+        {"question": question, "iterations": 0},
+        config=invoke_config,
+    )
     elapsed_ms = (time.perf_counter() - started) * 1000
 
     return {

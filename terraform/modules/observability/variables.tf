@@ -26,3 +26,8 @@ variable "max_iterations" {
   type        = number
   default     = 5
 }
+
+variable "alerts_topic_arn" {
+  description = "SNS topic the drift alarm notifies."
+  type        = string
+}
