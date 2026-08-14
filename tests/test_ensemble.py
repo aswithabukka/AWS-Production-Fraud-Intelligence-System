@@ -182,3 +182,13 @@ def test_refuses_degenerate_inputs(silver_frame):
     single_class[LABEL] = False
     with pytest.raises(ValueError, match="single class"):
         train_and_score(single_class)
+
+
+def test_cross_validation_confirms_stability(result):
+    """CV mean must corroborate the holdout AUC (within a few points) and the fold
+    spread must be tight — a high-variance model would be an unreliable ensemble member."""
+    m = result.metrics.set_index("model_name")
+    for name in ("lightgbm", "xgboost", "random_forest"):
+        assert m.loc[name, "cv5_auc_mean"] > 0.85
+        assert m.loc[name, "cv5_auc_std"] < 0.05
+        assert abs(m.loc[name, "cv5_auc_mean"] - m.loc[name, "holdout_roc_auc"]) < 0.06

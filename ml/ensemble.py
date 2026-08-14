@@ -38,7 +38,7 @@ from sklearn.metrics import (
     recall_score,
     roc_auc_score,
 )
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import StratifiedKFold, cross_val_score, train_test_split
 from sklearn.neural_network import MLPRegressor
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
@@ -315,10 +315,28 @@ def train_and_score(
     train_mask = X.index.isin(X_train.index)
     threshold = _best_f1_threshold(y[train_mask].to_numpy(), ensemble_full[train_mask])
 
+    # 5-fold cross-validated AUC on the TRAINING split for the fast supervised models —
+    # evidence that performance is stable across splits, not a lucky holdout. The SVM is
+    # excluded on cost grounds (5 refits of an O(n^2) kernel), and CV-AUC is not
+    # meaningful for the unsupervised members; those report null and the holdout column
+    # remains their evidence.
+    cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=seed)
+    cv_stats: dict[str, tuple[float, float]] = {}
+    for name in ("lightgbm", "xgboost", "random_forest"):
+        folds = cross_val_score(models[name], X_train, y_train, cv=cv, scoring="roc_auc", n_jobs=-1)
+        cv_stats[name] = (round(float(folds.mean()), 4), round(float(folds.std()), 4))
+
     metrics_rows = []
     for name, p in proba_test.items():
-        metrics_rows.append(_metric_row(name, y_test.to_numpy(), p, threshold))
-    metrics_rows.append(_metric_row("ensemble", y_test.to_numpy(), ensemble_test, threshold))
+        row = _metric_row(name, y_test.to_numpy(), p, threshold)
+        mean_std = cv_stats.get(name)
+        row["cv5_auc_mean"] = mean_std[0] if mean_std else None
+        row["cv5_auc_std"] = mean_std[1] if mean_std else None
+        metrics_rows.append(row)
+    ens_row = _metric_row("ensemble", y_test.to_numpy(), ensemble_test, threshold)
+    ens_row["cv5_auc_mean"] = None
+    ens_row["cv5_auc_std"] = None
+    metrics_rows.append(ens_row)
     metrics = pd.DataFrame(metrics_rows)
 
     scores = pd.DataFrame(
