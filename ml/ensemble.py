@@ -6,8 +6,12 @@ Five models, deliberately diverse in inductive bias, ensembled by averaging:
     XGBoost         gradient boosting — different regularisation and tree growth
     RandomForest    bagged trees — variance reduction, robust to feature scaling
     SVM (RBF)       margin-based — a genuinely different decision geometry
-    IsolationForest unsupervised anomaly score — needs no labels at all, so it
-                    contributes signal even where the label is wrong or missing
+    IsolationForest unsupervised anomaly score — needs no labels at all
+    Autoencoder     bottleneck MLP trained to reconstruct LEGITIMATE rows only;
+                    fraud reconstructs poorly, so reconstruction error is the score.
+                    The two unsupervised members fail differently: iForest measures
+                    isolatability, the autoencoder distance from the normal manifold —
+                    so the ensemble keeps signal even where the label is wrong or missing
 
 Everything in this module is pure pandas/sklearn — no Spark, no AWS — so the whole
 training path is unit-testable locally in seconds. The Glue job (`glue/ml_job.py`) is a
@@ -35,6 +39,7 @@ from sklearn.metrics import (
     roc_auc_score,
 )
 from sklearn.model_selection import train_test_split
+from sklearn.neural_network import MLPRegressor
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVC
@@ -178,6 +183,56 @@ def _build_models(scale_pos_weight: float) -> dict[str, Any]:
     }
 
 
+class _Autoencoder:
+    """Bottleneck MLP autoencoder for anomaly scoring, in plain sklearn.
+
+    MLPRegressor learns X -> X through a narrow middle layer. Trained ONLY on
+    legitimate rows: the network learns the manifold of normal behaviour, and rows far
+    from it — fraud — come back with high reconstruction error. Inputs are standardised
+    (reconstruction MSE is meaningless across unscaled feature magnitudes), and the
+    error->score normalisation uses TRAINING quantiles so scores are comparable across
+    runs; robust quantiles beat min/max because one extreme training row would
+    otherwise flatten everyone else's score.
+    """
+
+    def __init__(self, seed: int) -> None:
+        self.scaler = StandardScaler()
+        self.net = MLPRegressor(
+            hidden_layer_sizes=(32, 8, 32),  # the 8-unit bottleneck is the whole idea
+            activation="relu",
+            max_iter=400,
+            early_stopping=True,
+            random_state=seed,
+        )
+        self.err_lo = 0.0
+        self.err_hi = 1.0
+
+    def _errors(self, X: pd.DataFrame) -> np.ndarray:
+        Z = self.scaler.transform(X)
+        recon = self.net.predict(Z)
+        return np.mean((Z - recon) ** 2, axis=1)
+
+    def fit(self, X_legit: pd.DataFrame) -> "_Autoencoder":
+        import warnings
+
+        from sklearn.exceptions import ConvergenceWarning
+
+        Z = self.scaler.fit_transform(X_legit)
+        with warnings.catch_warnings():
+            # early_stopping governs reconstruction quality; max_iter is a cost bound.
+            # Hitting it is expected on some datasets and not a defect worth a log line.
+            warnings.simplefilter("ignore", ConvergenceWarning)
+            self.net.fit(Z, Z)
+        train_err = self._errors(X_legit)
+        self.err_lo = float(np.quantile(train_err, 0.01))
+        self.err_hi = float(np.quantile(train_err, 0.99))
+        return self
+
+    def scores(self, X: pd.DataFrame) -> np.ndarray:
+        span = max(self.err_hi - self.err_lo, 1e-9)
+        return np.clip((self._errors(X) - self.err_lo) / span, 0.0, 1.0)
+
+
 def _iforest_scores(
     model: IsolationForest, X: pd.DataFrame, train_min: float, train_max: float
 ) -> np.ndarray:
@@ -242,8 +297,14 @@ def train_and_score(
     proba_full["isolation_forest"] = _iforest_scores(iforest, X, lo, hi)
     proba_test["isolation_forest"] = _iforest_scores(iforest, X_test, lo, hi)
 
+    # Autoencoder: trained on LEGITIMATE training rows only, so the label's only role
+    # is selecting the normal manifold — it never supervises the reconstruction.
+    autoencoder = _Autoencoder(seed).fit(X_train[y_train.to_numpy() == 0])
+    proba_full["autoencoder"] = autoencoder.scores(X)
+    proba_test["autoencoder"] = autoencoder.scores(X_test)
+
     # ------------------------------------------------------------------ ensemble
-    # Equal-weight mean of all five. Simple on purpose: with five diverse members and a
+    # Equal-weight mean of all six. Simple on purpose: with six diverse members and a
     # portfolio-scale dataset, learned stacking weights would mostly fit noise — and an
     # unweighted mean is trivially explainable in review.
     ensemble_full = np.mean([proba_full[m] for m in proba_full], axis=0)
@@ -268,6 +329,7 @@ def train_and_score(
             "random_forest_fraud_probability": np.round(proba_full["random_forest"], 6),
             "svm_fraud_probability": np.round(proba_full["svm"], 6),
             "isolation_forest_anomaly_score": np.round(proba_full["isolation_forest"], 6),
+            "autoencoder_reconstruction_score": np.round(proba_full["autoencoder"], 6),
             "ensemble_fraud_score": np.round(ensemble_full, 6),
             "predicted_is_fraud": ensemble_full >= threshold,
             "actual_is_fraud": y.astype(bool).values,

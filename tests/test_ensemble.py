@@ -104,6 +104,7 @@ def test_all_five_models_produce_scores(result):
         "random_forest_fraud_probability",
         "svm_fraud_probability",
         "isolation_forest_anomaly_score",
+        "autoencoder_reconstruction_score",
         "ensemble_fraud_score",
     ):
         assert col in result.scores.columns
@@ -122,6 +123,7 @@ def test_metrics_cover_all_models_plus_ensemble(result):
         "random_forest",
         "svm",
         "isolation_forest",
+        "autoencoder",
         "ensemble",
     }
 
@@ -142,11 +144,21 @@ def test_ensemble_is_competitive_with_members(result):
     assert by_model["ensemble"] >= by_model.drop("ensemble").max() - 0.05
 
 
-def test_isolation_forest_carries_signal_without_labels(result):
+def test_unsupervised_members_carry_signal_without_labels(result):
     """Weaker than the supervised models, necessarily — but clearly better than chance,
-    or including it in the ensemble is pure noise."""
-    auc = result.metrics.set_index("model_name").loc["isolation_forest", "holdout_roc_auc"]
-    assert auc > 0.60
+    or including them in the ensemble is pure noise."""
+    by_model = result.metrics.set_index("model_name")["holdout_roc_auc"]
+    assert by_model["isolation_forest"] > 0.60
+    assert by_model["autoencoder"] > 0.60
+
+
+def test_autoencoder_never_saw_fraud_yet_ranks_it_higher(result):
+    """The reconstruction score must separate the classes despite training only on
+    legitimate rows — that is the entire claim of the method."""
+    scores = result.scores
+    fraud_mean = scores.loc[scores.actual_is_fraud, "autoencoder_reconstruction_score"].mean()
+    legit_mean = scores.loc[~scores.actual_is_fraud, "autoencoder_reconstruction_score"].mean()
+    assert fraud_mean > legit_mean
 
 
 def test_threshold_is_sane_and_predictions_follow_it(result):

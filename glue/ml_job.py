@@ -27,7 +27,14 @@ from pyspark.conf import SparkConf
 from pyspark.context import SparkContext
 from pyspark.sql import functions as F
 
-from glue.spark_utils import CATALOG, create_iceberg_table, get_logger, iceberg_spark_conf, merge_into
+from glue.spark_utils import (
+    CATALOG,
+    create_iceberg_table,
+    ensure_table_columns,
+    get_logger,
+    iceberg_spark_conf,
+    merge_into,
+)
 from ml.ensemble import train_and_score
 
 REQUIRED_ARGS = [
@@ -104,6 +111,7 @@ def main() -> None:
     scores_df = spark.createDataFrame(scores)
 
     create_iceberg_table(spark, scores_table, scores_df, partition_by="dt")
+    ensure_table_columns(spark, scores_table, scores_df)
     merge_into(spark, scores_table, scores_df, key_columns=["transaction_id"], temp_view="_scores_src")
     logger.info("merged %s scores into %s", len(scores), scores_table)
 
@@ -116,6 +124,7 @@ def main() -> None:
     metrics_df = spark.createDataFrame(metrics)
 
     create_iceberg_table(spark, metrics_table, metrics_df, partition_by=None)
+    ensure_table_columns(spark, metrics_table, metrics_df)
     # Append, not merge: every training run's metrics are history worth keeping —
     # model performance over time is itself a dashboard-worthy series.
     metrics_df.writeTo(metrics_table).append()

@@ -80,6 +80,22 @@ def create_iceberg_table(
     writer.create()
 
 
+def ensure_table_columns(spark: SparkSession, table: str, df: DataFrame) -> None:
+    """Additively evolve `table` to include any column present in `df` but not the table.
+
+    This is what lets a MERGE keep working after the writer grows a new output column
+    (the ensemble gaining a model, say): Iceberg treats ADD COLUMNS as a metadata commit,
+    and existing rows read the new column as NULL. Only additions — never drops or type
+    changes — the same additive-only rule the whole lakehouse follows.
+    """
+    existing = {f.name.lower() for f in spark.table(table).schema.fields}
+    missing = [f for f in df.schema.fields if f.name.lower() not in existing]
+    if not missing:
+        return
+    cols = ", ".join(f"{f.name} {f.dataType.simpleString()}" for f in missing)
+    spark.sql(f"ALTER TABLE {table} ADD COLUMNS ({cols})")
+
+
 def merge_into(
     spark: SparkSession,
     target_table: str,
