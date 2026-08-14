@@ -196,6 +196,22 @@ resource "aws_lakeformation_permissions" "agent_gold" {
   }
 }
 
+# The data lake administrator can GRANT anything but implicitly holds no data
+# permissions itself — discovered when revoking the account default cut off the very
+# identity running the agent locally. Admins govern; access is always explicit.
+resource "aws_lakeformation_permissions" "admin_gold" {
+  for_each = var.enable_lake_formation ? toset([var.fraud_metrics_table, var.merchant_risk_table]) : toset([])
+
+  depends_on  = [aws_lakeformation_data_lake_settings.main]
+  principal   = var.lake_formation_admin_arn
+  permissions = ["SELECT"]
+
+  table {
+    database_name = var.gold_database
+    name          = each.value
+  }
+}
+
 # risk_analyst: whole database, all columns. The investigative role.
 resource "aws_lakeformation_permissions" "risk_analyst_database" {
   count      = var.enable_lake_formation ? 1 : 0
