@@ -1,0 +1,446 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>fraud-lake — Field Guide to Every Issue We Hit</title>
+<style>
+:root {
+  --bg: #fafaf7; --card: #ffffff; --ink: #1a1c1e; --muted: #5c6166;
+  --line: #e4e2dc; --accent: #b4541e; --accent-soft: #fdf0e7;
+  --code-bg: #f4f2ec; --code-ink: #40342a;
+  --ok: #1e7a4c; --err: #b3382e;
+  --tag-env: #5b6abf; --tag-tf: #7a4fa3; --tag-spark: #b4541e; --tag-dqdl: #1e7a8c;
+  --tag-ai: #a3266e; --tag-lf: #8c6d1f; --tag-aws: #3d7a3d; --tag-ops: #666;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #16181b; --card: #1e2125; --ink: #e8e6e1; --muted: #9aa0a6;
+    --line: #33373d; --accent: #e8865a; --accent-soft: #2e2118;
+    --code-bg: #14161a; --code-ink: #d8c9b8;
+    --ok: #5fbf8f; --err: #e07a70;
+  }
+}
+* { box-sizing: border-box; margin: 0; }
+body {
+  background: var(--bg); color: var(--ink);
+  font: 16px/1.65 Georgia, 'Times New Roman', serif;
+  padding: 0 20px 80px;
+}
+.wrap { max-width: 860px; margin: 0 auto; }
+header { padding: 56px 0 8px; }
+.kicker {
+  font-family: ui-monospace, Menlo, monospace; font-size: 12px;
+  letter-spacing: .18em; text-transform: uppercase; color: var(--accent);
+}
+h1 { font-size: 40px; line-height: 1.15; font-weight: 700; margin: 10px 0 14px; }
+.lede { font-size: 19px; color: var(--muted); font-style: italic; max-width: 700px; }
+.stats {
+  display: flex; gap: 28px; flex-wrap: wrap; margin: 28px 0 8px;
+  padding: 18px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
+}
+.stat b { display: block; font-size: 28px; font-family: ui-monospace, Menlo, monospace; }
+.stat span { font-size: 13px; color: var(--muted); }
+
+/* filters */
+.filters { display: flex; gap: 8px; flex-wrap: wrap; margin: 26px 0 6px; position: sticky; top: 0; background: var(--bg); padding: 12px 0; z-index: 5; }
+.filters button {
+  font: 13px ui-monospace, Menlo, monospace; padding: 6px 14px; cursor: pointer;
+  border: 1px solid var(--line); background: var(--card); color: var(--muted);
+  border-radius: 999px; transition: all .15s;
+}
+.filters button:hover { border-color: var(--accent); color: var(--accent); }
+.filters button.on { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+
+h2.section {
+  font-size: 24px; margin: 48px 0 6px; padding-top: 18px;
+}
+.section-note { color: var(--muted); font-style: italic; margin-bottom: 18px; }
+
+/* issue card */
+.issue {
+  background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+  margin: 18px 0; overflow: hidden;
+}
+.issue summary {
+  list-style: none; cursor: pointer; padding: 16px 20px;
+  display: flex; align-items: baseline; gap: 12px;
+}
+.issue summary::-webkit-details-marker { display: none; }
+.issue summary:hover { background: var(--accent-soft); }
+.num {
+  font-family: ui-monospace, Menlo, monospace; font-size: 13px; color: var(--muted);
+  min-width: 30px;
+}
+.issue summary .title { font-weight: 700; font-size: 17px; flex: 1; }
+.tag {
+  font: 11px ui-monospace, Menlo, monospace; letter-spacing: .06em;
+  padding: 2px 9px; border-radius: 999px; color: #fff; white-space: nowrap;
+  align-self: center;
+}
+.body { padding: 4px 20px 20px 62px; }
+.body p { margin: 10px 0; }
+.field {
+  font: 12px ui-monospace, Menlo, monospace; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--muted); margin-top: 16px;
+}
+.field.fix { color: var(--ok); }
+.field.sym { color: var(--err); }
+pre {
+  background: var(--code-bg); color: var(--code-ink);
+  font: 13px/1.5 ui-monospace, Menlo, monospace;
+  padding: 12px 14px; border-radius: 8px; overflow-x: auto; margin: 8px 0;
+  white-space: pre-wrap; word-break: break-word;
+}
+.lesson {
+  margin-top: 16px; padding: 12px 16px; border-left: 3px solid var(--accent);
+  background: var(--accent-soft); border-radius: 0 8px 8px 0; font-style: italic;
+}
+.lesson::before { content: "Lesson — "; font-weight: 700; font-style: normal; }
+footer { margin-top: 60px; color: var(--muted); font-size: 14px; border-top: 1px solid var(--line); padding-top: 18px; }
+.hid { display: none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="kicker">fraud-lake · field notes</div>
+  <h1>Every Issue We Hit, and How Each One Fell</h1>
+  <p class="lede">Thirty real problems from taking a lakehouse from empty repo to a live, governed,
+  AI-queryable system on AWS — the symptom you'd see, where it lives, why it happens, and the fix.
+  Written so future-you can pattern-match in seconds.</p>
+  <div class="stats">
+    <div class="stat"><b>30</b><span>issues diagnosed &amp; fixed</span></div>
+    <div class="stat"><b>7</b><span>failed pipeline runs before green</span></div>
+    <div class="stat"><b>0</b><span>issues left unresolved</span></div>
+    <div class="stat"><b>~$3</b><span>total cost of all mistakes</span></div>
+  </div>
+</header>
+
+<nav class="filters" id="filters">
+  <button class="on" data-f="all">All 30</button>
+  <button data-f="env">Tooling</button>
+  <button data-f="tf">Terraform</button>
+  <button data-f="spark">Glue &amp; Spark</button>
+  <button data-f="dqdl">Data Quality</button>
+  <button data-f="ai">Bedrock &amp; AI</button>
+  <button data-f="lf">Lake Formation</button>
+  <button data-f="aws">Account &amp; Console</button>
+  <button data-f="ops">Process</button>
+</nav>
+
+<!-- ============================================================ TOOLING -->
+<h2 class="section" data-s="env">Local Environment &amp; Tooling</h2>
+<p class="section-note" data-s="env">Before AWS was even involved.</p>
+
+<details class="issue" data-c="env"><summary><span class="num">01</span><span class="title">Homebrew doesn't have Terraform anymore</span><span class="tag" style="background:var(--tag-env)">tooling</span></summary><div class="body">
+<div class="field sym">Symptom</div><pre>Warning: No available formula with the name "terraform"</pre>
+<p><b>Where:</b> <code>brew install terraform</code> on any modern Mac.</p>
+<p><b>Why:</b> HashiCorp relicensed Terraform (BSL), so Homebrew removed it from its core repository.</p>
+<div class="field fix">Fix</div><pre>brew tap hashicorp/tap
+brew install hashicorp/tap/terraform</pre>
+<div class="lesson">When a famous package "disappears" from a package manager, check for a vendor-owned tap/repo before assuming breakage.</div>
+</div></details>
+
+<details class="issue" data-c="env"><summary><span class="num">02</span><span class="title">JDK cask install failed — needs a password I can't give</span><span class="tag" style="background:var(--tag-env)">tooling</span></summary><div class="body">
+<div class="field sym">Symptom</div><pre>sudo: a terminal is required to read the password</pre>
+<p><b>Where:</b> <code>brew install --cask temurin@17</code> from a non-interactive session (needed a JVM to run PySpark tests locally).</p>
+<p><b>Why:</b> Casks run macOS installers that require sudo; formulas install into Homebrew's own prefix and don't.</p>
+<div class="field fix">Fix</div><pre>brew install openjdk@17   # formula, no sudo — then point JAVA_HOME at it</pre>
+<div class="lesson">Prefer formulas over casks in automation; casks assume a human at the keyboard.</div>
+</div></details>
+
+<details class="issue" data-c="env"><summary><span class="num">03</span><span class="title">Local package named <code>mcp/</code> shadowed the MCP SDK</span><span class="tag" style="background:var(--tag-env)">tooling</span></summary><div class="body">
+<div class="field sym">Symptom</div><p>Would have been an import loop: <code>from mcp.server import Server</code> inside <code>mcp/server.py</code> imports <em>itself</em>, not the SDK.</p>
+<p><b>Where:</b> The repo's MCP server directory vs the installed <code>mcp</code> pip package.</p>
+<div class="field fix">Fix</div><pre>git mv mcp mcp_server   # never name a local package after a dependency</pre>
+<div class="lesson">Python resolves your local directory first. Naming a package after its own dependency is a time bomb.</div>
+</div></details>
+
+<details class="issue" data-c="env"><summary><span class="num">04</span><span class="title">The MCP SDK's API had completely changed (v2.0)</span><span class="tag" style="background:var(--tag-env)">tooling</span></summary><div class="body">
+<div class="field sym">Symptom</div><p>Code written against the documented low-level API (<code>@server.list_tools()</code>, <code>stdio_server</code>) didn't match the installed SDK — those symbols had moved or gone.</p>
+<div class="field fix">Fix</div><p>Inspected the installed package directly (<code>dir()</code>, <code>inspect.signature</code>) and rewrote against the new <code>MCPServer</code> decorator API (<code>@server.tool()</code>), verified by listing tools programmatically before shipping.</p>
+<div class="lesson">In fast-moving ecosystems, the installed package is the documentation. Interrogate it before writing against memory or old docs.</div>
+</div></details>
+
+<details class="issue" data-c="env"><summary><span class="num">05</span><span class="title">Spark tests asserted different times on different machines</span><span class="tag" style="background:var(--tag-env)">tooling</span></summary><div class="body">
+<div class="field sym">Symptom</div><pre>assert datetime(2026,3,1,7,0) == datetime(2026,3,1,12,0)   # off by exactly the local UTC offset</pre>
+<p><b>Where:</b> Local PySpark tests asserting timestamp equality.</p>
+<p><b>Why:</b> PySpark converts timestamps to Python datetimes using the <em>driver's local timezone</em> on <code>collect()</code>.</p>
+<div class="field fix">Fix</div><pre># conftest.py, before the JVM starts
+os.environ["TZ"] = "UTC"; time.tzset()</pre>
+<div class="lesson">Pin the test process to UTC. Any timestamp test that passes only in one timezone is already broken.</div>
+</div></details>
+
+<details class="issue" data-c="env"><summary><span class="num">06</span><span class="title">Spark's least() silently eats NULLs — a real logic bug</span><span class="tag" style="background:var(--tag-spark)">spark</span></summary><div class="body">
+<div class="field sym">Symptom</div><p>A customer's <em>first</em> transaction (no prior location → distance should be NULL) came back as <b>20,015 km</b> — the exact antipodal maximum — flagging everyone's first purchase as impossible travel.</p>
+<p><b>Where:</b> The haversine helper's NaN guard: <code>F.least(a, F.lit(1.0))</code>.</p>
+<p><b>Why:</b> SQL's <code>least()</code> <em>skips</em> NULLs instead of propagating them, so <code>least(NULL, 1.0) = 1.0</code> → asin(1) → half the Earth's circumference.</p>
+<div class="field fix">Fix</div><pre>capped = F.when(a.isNotNull(), F.least(a, F.lit(1.0)))   # NULL stays NULL</pre>
+<div class="lesson">least/greatest ignore NULLs by SQL standard. Guard explicitly whenever NULL means "unknown" rather than "zero". A local unit test caught this — that's why the transforms are pure functions.</div>
+</div></details>
+
+<!-- ============================================================ TERRAFORM -->
+<h2 class="section" data-s="tf">Terraform &amp; Infrastructure-as-Code</h2>
+<p class="section-note" data-s="tf">Found by <code>terraform validate</code> and first applies.</p>
+
+<details class="issue" data-c="tf"><summary><span class="num">07</span><span class="title">S3 Vectors resources don't export <code>.arn</code></span><span class="tag" style="background:var(--tag-tf)">terraform</span></summary><div class="body">
+<div class="field sym">Symptom</div><pre>Error: Unsupported attribute — This object has no ... "arn"</pre>
+<div class="field fix">Fix</div><p>The attributes are service-prefixed: <code>vector_bucket_arn</code> and <code>index_arn</code>. Confirmed by dumping the provider schema (<code>terraform providers schema -json</code>) instead of guessing.</p>
+<div class="lesson">For brand-new AWS services, the provider schema is the source of truth — grep it, don't assume conventions.</div>
+</div></details>
+
+<details class="issue" data-c="tf"><summary><span class="num">08</span><span class="title">Firehose rejects an SSE block when reading from Kinesis</span><span class="tag" style="background:var(--tag-tf)">terraform</span></summary><div class="body">
+<div class="field sym">Symptom</div><pre>"server_side_encryption": conflicts with kinesis_source_configuration</pre>
+<p><b>Why:</b> With a Kinesis source, records arrive already encrypted; Firehose's own SSE setting is meaningless and the provider enforces that.</p>
+<div class="field fix">Fix</div><p>Delete the block, leave a comment explaining why it's absent so nobody "helpfully" re-adds it.</p>
+<div class="lesson">When two settings conflict, the fix often isn't choosing one — it's understanding which one was never applicable.</div>
+</div></details>
+
+<details class="issue" data-c="tf"><summary><span class="num">09</span><span class="title">Terraform has floor(), not round()</span><span class="tag" style="background:var(--tag-tf)">terraform</span></summary><div class="body">
+<div class="field sym">Symptom</div><pre>Error: There is no function named "round".</pre>
+<div class="field fix">Fix</div><p><code>floor()</code> / <code>ceil()</code>. HCL's function library is small and worth skimming once.</p>
+<div class="lesson">HCL is not a general-purpose language; verify functions exist before leaning on them.</div>
+</div></details>
+
+<details class="issue" data-c="tf"><summary><span class="num">10</span><span class="title">Brand-new S3 bucket 404'd its own uploads mid-apply</span><span class="tag" style="background:var(--tag-tf)">terraform</span></summary><div class="body">
+<div class="field sym">Symptom</div><pre>Error: reading S3 Object (…/bronze_job.py): couldn't find resource</pre>
+<p><b>Where:</b> The very first <code>apply</code>, uploading Glue scripts seconds after creating the bucket.</p>
+<p><b>Why:</b> A new bucket's name takes a minute to propagate through AWS DNS; the provider's read-back races it.</p>
+<div class="field fix">Fix</div><p>Nothing to change — re-run <code>terraform plan &amp;&amp; apply</code>. Terraform reconciles and finishes the stragglers (13 resources on the second pass).</p>
+<div class="lesson">First-apply failures on brand-new buckets are usually propagation, not configuration. Re-plan before debugging.</div>
+</div></details>
+
+<details class="issue" data-c="tf"><summary><span class="num">11</span><span class="title">"Saved plan is stale" — plan files are single-use</span><span class="tag" style="background:var(--tag-tf)">terraform</span></summary><div class="body">
+<div class="field sym">Symptom</div><pre>Error: Saved plan is stale — state was changed by another operation after the plan was created</pre>
+<p><b>Where:</b> Running <code>apply tfplan</code> a second time, or after any other plan/apply touched state.</p>
+<div class="field fix">Fix</div><p>Regenerate: <code>terraform plan -out=tfplan</code> then apply the fresh file. If the first apply actually succeeded, the new plan simply says "No changes".</p>
+<div class="lesson">A plan file is a one-shot snapshot pinned to a state serial. Stale ≠ broken; it's a consistency guarantee doing its job.</div>
+</div></details>
+
+<details class="issue" data-c="tf"><summary><span class="num">12</span><span class="title">Replacing a resource orphaned its dependent in state</span><span class="tag" style="background:var(--tag-tf)">terraform</span></summary><div class="body">
+<div class="field sym">Symptom</div><pre>ResourceNotFoundException: DataSource with id GAJKPQHZZM in knowledgeBase CHB9ICDAZG is not found</pre>
+<p><b>Where:</b> Replacing the S3 Vectors index forced the Knowledge Base to be recreated; its old data source died with it, but Terraform still held the corpse in state and tried to <em>update</em> it against the new KB.</p>
+<div class="field fix">Fix</div><pre>terraform state rm 'module.bedrock[0].aws_bedrockagent_data_source.policies'
+terraform plan &amp;&amp; apply   # recreates it fresh</pre>
+<div class="lesson">When a parent is replaced and the provider doesn't cascade correctly, <code>state rm</code> the dead child and let Terraform recreate it. State surgery is a normal tool, not a hack.</div>
+</div></details>
+
+<details class="issue" data-c="tf"><summary><span class="num">13</span><span class="title">stream-down by flag left tfvars saying "on"</span><span class="tag" style="background:var(--tag-tf)">terraform</span></summary><div class="body">
+<div class="field sym">Symptom</div><p>A later routine <code>plan</code> unexpectedly wanted to recreate the Kinesis stream (+$29/mo).</p>
+<p><b>Why:</b> <code>make stream-down</code> used <code>-var enable_stream=false</code> — a one-shot override; the recorded default in <code>terraform.tfvars</code> still said <code>true</code>, and the next plain plan reasserted it.</p>
+<div class="field fix">Fix</div><p>Caught it in plan review and pinned the tfvars to match reality before applying.</p>
+<div class="lesson">Command-line var overrides don't persist. If a toggle matters for cost, make the <em>file</em> reflect the truth — and always read the plan summary line.</div>
+</div></details>
+
+<!-- ============================================================ SPARK/GLUE -->
+<h2 class="section" data-s="spark">Glue &amp; Spark — the seven-run gauntlet</h2>
+<p class="section-note" data-s="spark">Local tests passed; the cloud had opinions. Each failure moved one stage further.</p>
+
+<details class="issue" data-c="spark"><summary><span class="num">14</span><span class="title">Run 1–2 · "Cannot modify the value of a static config"</span><span class="tag" style="background:var(--tag-spark)">spark</span></summary><div class="body">
+<div class="field sym">Symptom</div><pre>AnalysisException: Cannot modify the value of a static config: spark.sql.extensions</pre>
+<p><b>Where:</b> Every Glue job — configuring Iceberg with <code>spark.conf.set()</code> <em>after</em> getting the session.</p>
+<p><b>Why:</b> Session extensions and catalog implementations are <em>static</em> configs — they must exist before the SparkSession is born.</p>
+<div class="field fix">Fix</div><pre>conf = SparkConf()
+for k, v in iceberg_conf().items(): conf.set(k, v)
+sc = SparkContext.getOrCreate(conf)      # config BEFORE context</pre>
+<div class="lesson">Spark configs come in two castes: static (pre-session) and runtime. Extensions, catalogs, and classpath-adjacent settings are always static.</div>
+</div></details>
+
+<details class="issue" data-c="spark"><summary><span class="num">15</span><span class="title">Run 3 · The quality gate was denied publishing its own metrics</span><span class="tag" style="background:var(--tag-spark)">spark</span></summary><div class="body">
+<div class="field sym">Symptom</div><pre>User …/fraud-lake-glue-role is not authorized to perform: cloudwatch:PutMetricData</pre>
+<p><b>Where:</b> Glue Data Quality's built-in CloudWatch publishing.</p>
+<p><b>Why:</b> My IAM policy scoped <code>PutMetricData</code> to <code>fraud-lake/*</code> namespaces — but Glue DQ publishes to the AWS-owned namespace <code>Glue Data Quality</code>.</p>
+<div class="field fix">Fix</div><pre>values = ["fraud-lake/*", "Glue Data Quality"]   # in the namespace condition</pre>
+<div class="lesson">Tight IAM scoping is right — but managed features publish under their own namespaces/paths. Budget one allow-list entry for the service itself.</div>
+</div></details>
+
+<details class="issue" data-c="spark"><summary><span class="num">16</span><span class="title">Run 4 · process_rows returns a collection, not a frame</span><span class="tag" style="background:var(--tag-spark)">spark</span></summary><div class="body">
+<div class="field sym">Symptom</div><pre>AttributeError: 'DynamicFrameCollection' object has no attribute 'toDF'</pre>
+<p><b>Why:</b> <code>EvaluateDataQuality().process_rows</code> returns <em>two</em> frames — per-rule verdicts (<code>ruleOutcomes</code>) and per-row annotations — wrapped in a collection.</p>
+<div class="field fix">Fix</div><pre>rule_outcomes = SelectFromCollection.apply(dfc=outcomes, key="ruleOutcomes")
+results = rule_outcomes.toDF()...</pre>
+<div class="lesson">Glue's transform APIs often return collections. When an AWS API surprises you, the runtime error names the real type — read it literally.</div>
+</div></details>
+
+<details class="issue" data-c="spark"><summary><span class="num">17</span><span class="title">Run 7 · F.nullif works locally, dies on Glue</span><span class="tag" style="background:var(--tag-spark)">spark</span></summary><div class="body">
+<div class="field sym">Symptom</div><pre>AnalysisException: Invalid call to dataType on unresolved object</pre>
+<p><b>Where:</b> Gold job's loss-rate division guard — passed 40 local Spark tests, failed on Glue 5.</p>
+<p><b>Why:</b> Glue's Spark fork rejects <code>nullif()</code> over unresolved columns even though stock PySpark 3.5 accepts it.</p>
+<div class="field fix">Fix</div><pre>F.when(F.col("total") &gt; 0, 100.0 * F.col("loss") / F.col("total"))  # NULL otherwise</pre>
+<div class="lesson">Glue ≈ Spark, not =. Prefer boring primitives (when/otherwise) over exotic functions in code that must run on managed forks. Getting the true stack trace from CloudWatch (not the truncated console error) was what cracked this.</div>
+</div></details>
+
+<!-- ============================================================ DQDL -->
+<h2 class="section" data-s="dqdl">Data Quality (DQDL) — a language with sharp edges</h2>
+<p class="section-note" data-s="dqdl">Six semantics traps in one small rule language.</p>
+
+<details class="issue" data-c="dqdl"><summary><span class="num">18</span><span class="title">Run 5 · Hand-rolled freshness: 0% of fresh rows "passed"</span><span class="tag" style="background:var(--tag-dqdl)">dqdl</span></summary><div class="body">
+<div class="field sym">Symptom</div><pre>ColumnValues "transaction_timestamp" &gt; (now() - 3 hours) → "0.00 % of rows passed"</pre>
+<p><b>Why:</b> The now()-arithmetic expression doesn't evaluate the way it reads on timestamp columns. The data was provably 90 minutes old.</p>
+<div class="field fix">Fix</div><p>First switched to <code>DataFreshness</code>… which exposed issue 19. Final form is issue 19's CustomSql.</p>
+<div class="lesson">If a DQ rule fails at exactly 0% or 100% on data you know is mixed, suspect the rule's semantics before the data.</div>
+</div></details>
+
+<details class="issue" data-c="dqdl"><summary><span class="num">19</span><span class="title">DataFreshness is per-row — yesterday's good data "goes stale"</span><span class="tag" style="background:var(--tag-dqdl)">dqdl</span></summary><div class="body">
+<div class="field sym">Symptom</div><p>(Caught in audit before it fired.) <code>DataFreshness &lt;= 3 hours</code> evaluates <em>every row</em> of the whole table — so any run more than 3 hours after the first batch would fail forever on history.</p>
+<div class="field fix">Fix</div><pre>CustomSql "SELECT COUNT(*) FROM primary
+           WHERE transaction_timestamp &gt; current_timestamp() - INTERVAL 3 HOURS" &gt; 0</pre>
+<p>Liveness = "does at least one recent row exist", not "is every row young".</p>
+<div class="lesson">Pin down whether a rule is per-row or per-dataset before trusting it. Freshness is a property of the newest row.</div>
+</div></details>
+
+<details class="issue" data-c="dqdl"><summary><span class="num">20</span><span class="title">Run 6 · One boolean-vs-string rule poisoned all 15 rules</span><span class="tag" style="background:var(--tag-dqdl)">dqdl</span></summary><div class="body">
+<div class="field sym">Symptom</div><pre>14 of 15 rules "failed", every one carrying the same error:
+DATATYPE_MISMATCH … (is_high_velocity IN (true, false)) … ["BOOLEAN","STRING","STRING"]</pre>
+<p><b>Why:</b> <code>ColumnValues "is_high_velocity" in ["true","false"]</code> compared a BOOLEAN column to strings — a Spark type error that took the whole evaluation query down with it.</p>
+<div class="field fix">Fix</div><p>Replaced with <code>IsComplete</code> (existence is the meaningful check; the true/false mix lives on the dashboard).</p>
+<div class="lesson">DQ rules compile into one big query — one type-broken rule fails everything. When every rule fails identically, look for the one malformed rule, not fifteen data problems.</div>
+</div></details>
+
+<details class="issue" data-c="dqdl"><summary><span class="num">21</span><span class="title">DQDL between excludes its own boundaries</span><span class="tag" style="background:var(--tag-dqdl)">dqdl</span></summary><div class="body">
+<div class="field sym">Symptom</div><p><code>fraud_signal_count between 0 and 4</code> fails every row with 0 signals — the most common value. Same trap waited on rates of exactly 0% or 100%.</p>
+<div class="field fix">Fix</div><pre>between -1 and 5          # the inclusive 0..4
+between -0.001 and 100.001  # for percentages</pre>
+<div class="lesson">DQDL's between is exclusive. Nudge bounds outward whenever the boundary value is legitimate.</div>
+</div></details>
+
+<details class="issue" data-c="dqdl"><summary><span class="num">22</span><span class="title">NULLs count as failures even with a threshold that "should" cover them</span><span class="tag" style="background:var(--tag-dqdl)">dqdl</span></summary><div class="body">
+<div class="field sym">Symptom</div><pre>ColumnValues "geo_distance_from_prior_km" &gt;= 0 with threshold &gt;= 0.60
+→ "Value: NULL does not meet the constraint requirement!"</pre>
+<p><b>Why:</b> Every customer's first transaction has NULL distance by design — a large share of a young table. NULLs fail ColumnValues, and the young-table NULL share overwhelmed a threshold calibrated for a mature one.</p>
+<div class="field fix">Fix</div><p>Recalibrated the threshold for the table's actual life stage (0.60), documented that it tightens as history accumulates.</p>
+<div class="lesson">Rules that are correct for a mature table can be wrong for a young one. Calibrate thresholds to the data you have, not the data you'll have.</div>
+</div></details>
+
+<details class="issue" data-c="dqdl"><summary><span class="num">23</span><span class="title">ReferentialIntegrity can't see catalog tables — and the cold-start paradox</span><span class="tag" style="background:var(--tag-dqdl)">dqdl</span></summary><div class="body">
+<div class="field sym">Symptom</div><p>(Caught in audit.) Two stacked problems: ① DQDL's <code>ReferentialIntegrity</code> resolves its reference against datasets wired into the evaluator call — a catalog path in the rule string errors out. ② The referenced <code>merchant_dim</code> is <em>created by the silver job</em>, which runs after the bronze gate: on the first-ever run the table can't exist.</p>
+<div class="field fix">Fix</div><pre># ① same check, ordinary Spark, where the Iceberg catalog already exists:
+CustomSql "SELECT COUNT(*) FROM primary p
+           LEFT ANTI JOIN glue_catalog.fraud_silver.merchant_dim d
+           ON p.merchant_id = d.merchant_id" = 0
+# ② quality job detects the missing dim and drops this one rule on the first run only</pre>
+<div class="lesson">Bootstrapping order matters: a gate must not depend on an artifact produced downstream of itself — unless it knows how to cold-start. And CustomSql is the escape hatch for anything DQDL's built-ins can't express.</div>
+</div></details>
+
+<!-- ============================================================ AI -->
+<h2 class="section" data-s="ai">Bedrock &amp; the AI Layer</h2>
+
+<details class="issue" data-c="ai"><summary><span class="num">24</span><span class="title">The Model Access page is gone; Anthropic wants a form anyway</span><span class="tag" style="background:var(--tag-ai)">bedrock</span></summary><div class="body">
+<div class="field sym">Symptom</div><pre>ResourceNotFoundException: Model use case details have not been submitted for this account.</pre>
+<p><b>Where:</b> First Claude invocation. Meanwhile Amazon's own Titan model worked instantly — that asymmetry was the clue.</p>
+<p><b>Why:</b> AWS retired per-model enablement (models now auto-enable on first invoke), but Anthropic's provider terms still require a one-time use-case form.</p>
+<div class="field fix">Fix</div><p>Bedrock console → Playgrounds → pick a Claude model → submit the use-case form (a GitHub profile URL works as "company website" for individuals). Active within ~15 minutes, once per account, ever.</p>
+<div class="lesson">Platform gates and provider gates are different layers. When one model works and another doesn't, suspect provider terms, not your IAM.</div>
+</div></details>
+
+<details class="issue" data-c="ai"><summary><span class="num">25</span><span class="title">Knowledge Base ingestion failed 3 of 4 documents</span><span class="tag" style="background:var(--tag-ai)">bedrock</span></summary><div class="body">
+<div class="field sym">Symptom</div><pre>Invalid record: Filterable metadata must have at most 2048 bytes (S3Vectors, 400)</pre>
+<p><b>Why:</b> S3 Vectors caps <em>filterable</em> metadata at 2,048 bytes/vector, and Bedrock stores each chunk's full text in metadata. I declared the wrong key non-filterable, so real chunks blew the cap. The tell: the only "success" was a 28-byte placeholder file.</p>
+<div class="field fix">Fix</div><pre>non_filterable_metadata_keys = ["AMAZON_BEDROCK_TEXT",
+  "AMAZON_BEDROCK_TEXT_CHUNK", "AMAZON_BEDROCK_METADATA"]  # cover all variants</pre>
+<p>Result: 3/3 documents indexed, retrieval scoring 0.87 on the first query.</p>
+<div class="lesson">When most items fail and one tiny one succeeds, the size of the survivor is the diagnosis. Also: exclude junk placeholders from any prefix a knowledge base ingests.</div>
+</div></details>
+
+<!-- ============================================================ LF -->
+<h2 class="section" data-s="lf">Lake Formation — five lessons in one afternoon</h2>
+<p class="section-note" data-s="lf">The most gotcha-dense service in the project. Each error was the security model teaching itself.</p>
+
+<details class="issue" data-c="lf"><summary><span class="num">26</span><span class="title">IAM admin ≠ Lake Formation admin</span><span class="tag" style="background:var(--tag-lf)">lakeformation</span></summary><div class="body">
+<div class="field sym">Symptom</div><pre>AccessDeniedException: Resource does not exist or requester is not authorized (GrantPermissions)</pre>
+<p><b>Why:</b> LF keeps its own administrator registry, separate from IAM. Even <code>AdministratorAccess</code> can't manage grants until registered as a <em>data lake administrator</em>.</p>
+<div class="field fix">Fix</div><pre>resource "aws_lakeformation_data_lake_settings" "main" {
+  admins = [caller_arn]
+  # + explicitly preserve IAM_ALLOWED_PRINCIPALS create-defaults
+}</pre>
+<div class="lesson">IAM decides who can call APIs; Lake Formation separately decides who governs data. Register before granting — and preserve create-defaults so enabling LF can't silently break table creation.</div>
+</div></details>
+
+<details class="issue" data-c="lf"><summary><span class="num">27</span><span class="title">Column exclusions need wildcard=true — and per-table lists</span><span class="tag" style="background:var(--tag-lf)">lakeformation</span></summary><div class="body">
+<div class="field sym">Symptom</div><pre>"table_with_columns.0.wildcard": one of column_names, wildcard must be specified</pre>
+<p><b>Plus:</b> a shared exclusion list would have failed anyway — LF rejects excluding a column the table doesn't have, and the two gold tables have different columns.</p>
+<div class="field fix">Fix</div><p><code>wildcard = true</code> alongside <code>excluded_column_names</code> ("all columns except these"), with a separate exclusion list per table.</p>
+<div class="lesson">Exclusions are exclusions <em>from a wildcard</em>. And schema-coupled security config must be maintained per table, not shared.</div>
+</div></details>
+
+<details class="issue" data-c="lf"><summary><span class="num">28</span><span class="title">Personas denied S3 — hybrid mode needs opt-ins</span><span class="tag" style="background:var(--tag-lf)">lakeformation</span></summary><div class="body">
+<div class="field sym">Symptom</div><pre>PERMISSION_DENIED: … not authorized to perform: s3:GetObject on …/gold/…/metadata/…</pre>
+<p><b>Why:</b> The persona roles have no direct S3 access by design — they rely on LF credential vending. But the location was registered in <em>hybrid</em> mode, which only vends for principals explicitly opted in.</p>
+<div class="field fix">Fix</div><p>Registered the location in standard mode (vends for any LF-permitted principal), and registered the <code>gold/</code> prefix where the data actually lives. Also: Athena needs <code>s3:GetBucketLocation</code> on the results bucket — a one-line IAM add.</p>
+<div class="lesson">Hybrid vs standard registration decides <em>who gets vended credentials</em>. And register the prefix your data actually lives under, not a notional one.</div>
+</div></details>
+
+<details class="issue" data-c="lf"><summary><span class="num">29</span><span class="title">Column filters silently shadowed by the account default</span><span class="tag" style="background:var(--tag-lf)">lakeformation</span></summary><div class="body">
+<div class="field sym">Symptom</div><p>No error at all — the worst kind. Effective permissions are a union, and the default <code>IAMAllowedPrincipals = ALL</code> grant on every table would have given the analyst full columns despite the careful exclusion grant.</p>
+<div class="field fix">Fix</div><pre># grant the pipeline + agent roles explicitly FIRST, then per table:
+aws lakeformation revoke-permissions \
+  --principal DataLakePrincipalIdentifier=IAM_ALLOWED_PRINCIPALS \
+  --permissions ALL --resource '{"Table":{...}}'</pre>
+<div class="lesson">LF's grandfathered default makes every IAM principal super-user until revoked per table. Order matters: explicit grants for everything that must keep working, <em>then</em> revoke the default.</div>
+</div></details>
+
+<details class="issue" data-c="lf"><summary><span class="num">30</span><span class="title">The revoke cut off the admin itself — and the AI agent with it</span><span class="tag" style="background:var(--tag-lf)">lakeformation</span></summary><div class="body">
+<div class="field sym">Symptom</div><pre>Insufficient permissions … Principal does not have any privilege on specified resource</pre>
+<p><b>Where:</b> The admin's own Athena queries — and therefore the agent's <code>query_lakehouse</code> tool — right after revoking the default.</p>
+<p><b>Why:</b> Data lake administrators hold <em>grant power</em>, not implicit <em>data access</em>. Admins govern; access is always explicit.</p>
+<div class="field fix">Fix</div><p>An explicit <code>SELECT</code> grant to the admin identity on the gold tables. Agent answering again in 11.5 s.</p>
+<div class="lesson">The final and best lesson of the day: in a properly governed lake, <b>nobody</b> — not even the administrator — reads data without an explicit grant. If your governance change breaks you too, it's probably working.</div>
+</div></details>
+
+<!-- ============================================================ AWS/CONSOLE -->
+<h2 class="section" data-s="aws">Account &amp; Console</h2>
+
+<details class="issue" data-c="aws"><summary><span class="num">31</span><span class="title">Budget blocked by an accidental empty "action"</span><span class="tag" style="background:var(--tag-aws)">console</span></summary><div class="body">
+<div class="field sym">Symptom</div><pre>Review the errors below and try again — Select IAM role (required)</pre>
+<p><b>Why:</b> Budget <em>actions</em> (auto-applying lockdown policies) are an advanced feature needing an execution role; an empty one was added by mis-click. Email alerts need none of it.</p>
+<div class="field fix">Fix</div><p>Click <b>Remove</b> on the action; save. Alerts-only is the right shape for a personal project.</p>
+<div class="lesson">In AWS consoles, the advanced optional feature is often one mis-click away from blocking the basic flow. Remove what you didn't mean to add rather than satisfying its requirements.</div>
+</div></details>
+
+<details class="issue" data-c="aws"><summary><span class="num">32</span><span class="title">IAM admin gets "Access denied" all over Billing</span><span class="tag" style="background:var(--tag-aws)">console</span></summary><div class="body">
+<div class="field sym">Symptom</div><p>Every cost tile in Billing red with "Access denied" — while holding <code>AdministratorAccess</code>.</p>
+<p><b>Why:</b> Billing has a separate root-only gate: "IAM user and role access to Billing information" is off by default.</p>
+<div class="field fix">Fix</div><p>Log in as root once → Account settings → activate IAM access to billing. (Root logs in with the account <em>email</em>, not a username.)</p>
+<div class="lesson">Billing is special-cased outside IAM until root opens it. Do it on day one, then put root away with MFA.</div>
+</div></details>
+
+<!-- ============================================================ OPS -->
+<h2 class="section" data-s="ops">Process &amp; Operations</h2>
+
+<details class="issue" data-c="ops"><summary><span class="num">33</span><span class="title">Deleting bad rows downstream didn't stick</span><span class="tag" style="background:var(--tag-ops)">process</span></summary><div class="body">
+<div class="field sym">Symptom</div><p>Deleted 146 unknown-merchant rows from bronze; the very next run re-imported all 146 and the gate failed again identically.</p>
+<p><b>Why:</b> Bronze re-derives from the raw zone every run — and the poisoned objects were still sitting in raw. Raw is immutable-by-design; downstream deletes can't survive a re-derive.</p>
+<div class="field fix">Fix</div><p>Remediate <em>upstream first</em>: delete the 4 poison objects from raw (identified precisely by their Firehose timestamp window), then the Iceberg <code>DELETE FROM</code> in bronze, then re-run → green.</p>
+<div class="lesson">In a medallion architecture, fixes flow the same direction as data. Cleaning a derived layer while the source stays dirty just schedules the same incident again.</div>
+</div></details>
+
+<details class="issue" data-c="ops"><summary><span class="num">34</span><span class="title">"It failed again!" — no, that's yesterday's report</span><span class="tag" style="background:var(--tag-ops)">process</span></summary><div class="body">
+<div class="field sym">Symptom</div><p>Three separate times, an old failure report or a previous execution's status was mistaken for the current run's result — causing phantom "regressions".</p>
+<p><b>Why:</b> Failure reports in S3 and the Step Functions execution list are <em>history</em>. They accumulate; nothing about them says "not current".</p>
+<div class="field fix">Fix</div><p>Ritual: before diagnosing anything, match the report's timestamp / execution's start time against when you actually ran. Named executions help (<code>s3-…</code> = auto-trigger, UUID = manual).</p>
+<div class="lesson">Every artifact you read during an incident needs a freshness check first. The most convincing wrong evidence is real evidence from the wrong time.</div>
+</div></details>
+
+<footer>
+  Generated from the live build log of <b>fraud-lake</b>, 2026-08-12 → 2026-08-15.
+  Every fix above is a commit in the repo — <code>git log</code> is the long-form version of this page.
+  Companion doc: <code>docs/as-run-results.md</code> for what the healthy system measured.
+</footer>
+
+</div>
+<script>
+const buttons = document.querySelectorAll('#filters button');
+buttons.forEach(b => b.addEventListener('click', () => {
+  buttons.forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  const f = b.dataset.f;
+  document.querySelectorAll('.issue').forEach(el =>
+    el.classList.toggle('hid', f !== 'all' && el.dataset.c !== f));
+  document.querySelectorAll('[data-s]').forEach(el =>
+    el.classList.toggle('hid', f !== 'all' && el.dataset.s !== f));
+}));
+</script>
+</body>
+</html>
