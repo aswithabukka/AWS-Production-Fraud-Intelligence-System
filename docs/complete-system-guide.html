@@ -1,0 +1,638 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>fraud-lake — The Complete System Guide</title>
+<style>
+:root {
+  --bg:#fbfaf7; --card:#fff; --ink:#20232a; --muted:#5c626b; --line:#e5e2da;
+  --accent:#0f6b5c; --accent-soft:#e9f3f0; --code-bg:#f2f0ea; --code-ink:#3d3730;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#15171a; --card:#1d2025; --ink:#e7e4de; --muted:#9aa1aa; --line:#32363d;
+          --accent:#57c4ab; --accent-soft:#1d2b27; --code-bg:#111317; --code-ink:#cfc6b8; }
+}
+* { box-sizing:border-box; }
+body { margin:0; background:var(--bg); color:var(--ink);
+  font:17px/1.7 Georgia, 'Times New Roman', serif; }
+.wrap { max-width:880px; margin:0 auto; padding:0 22px 90px; }
+header.hero { padding:60px 0 10px; }
+.kicker { font:12px ui-monospace,Menlo,monospace; letter-spacing:.2em; text-transform:uppercase; color:var(--accent); }
+h1.hero-title { font-size:42px; line-height:1.12; margin:10px 0 12px; }
+.lede { font-size:19px; font-style:italic; color:var(--muted); border-bottom:1px solid var(--line); padding-bottom:26px; }
+h2 { font-size:28px; margin:56px 0 6px; padding-top:14px; border-top:3px solid var(--accent); }
+h3 { font-size:21px; margin:34px 0 4px; }
+h4 { font-size:17px; margin:26px 0 2px; color:var(--accent); }
+p { margin:10px 0; }
+li { margin:5px 0; }
+strong { color:var(--ink); }
+em { color:var(--muted); }
+hr { border:none; border-top:1px solid var(--line); margin:40px 0; }
+code { background:var(--code-bg); color:var(--code-ink); font:0.82em ui-monospace,Menlo,monospace;
+  padding:1px 6px; border-radius:5px; }
+pre { background:var(--code-bg); padding:16px 18px; border-radius:10px; overflow-x:auto;
+  font-size:13px; line-height:1.5; border:1px solid var(--line); }
+pre code { background:none; padding:0; font-size:inherit; }
+table { border-collapse:collapse; width:100%; margin:16px 0; font-size:15px; }
+th { text-align:left; font-family:ui-monospace,Menlo,monospace; font-size:12px; letter-spacing:.08em;
+  text-transform:uppercase; color:var(--muted); border-bottom:2px solid var(--accent); padding:8px 12px; }
+td { border-bottom:1px solid var(--line); padding:9px 12px; vertical-align:top; }
+tr:hover td { background:var(--accent-soft); }
+blockquote { margin:14px 0; padding:10px 18px; border-left:3px solid var(--accent);
+  background:var(--accent-soft); border-radius:0 8px 8px 0; font-style:italic; }
+.toc { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:18px 24px; margin:26px 0; }
+.toc b { font-family:ui-monospace,Menlo,monospace; font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); }
+.toc a { color:var(--accent); text-decoration:none; }
+.toc a:hover { text-decoration:underline; }
+footer { margin-top:70px; padding-top:20px; border-top:1px solid var(--line); color:var(--muted); font-size:14px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+<header class="hero">
+  <div class="kicker">fraud-lake · reference</div>
+  <h1 class="hero-title">The Complete System Guide</h1>
+  <p class="lede">What we built, every AWS service in it, why each one is there, how they
+  connect, and when you'd use each of them again. Read it once top-to-bottom and you can
+  explain the platform to someone else — the real test of understanding it.</p>
+</header>
+<nav class="toc"><b>Contents</b><br>
+1. <a href="#1-the-big-picture-what-is-this-thing">The Big Picture</a> ·
+2. <a href="#2-the-journey-of-one-transaction">The Journey of One Transaction</a> ·
+3. <a href="#3-service-by-service-what-why-and-when-youd-use-it-again">Service by Service</a> ·
+4. <a href="#4-why-this-specific-shape-the-five-principles">The Five Principles</a> ·
+5. <a href="#5-when-should-i-use-x-the-future-scenarios-cheat-sheet">Future-Scenarios Cheat Sheet</a> ·
+6. <a href="#6-where-everything-lives">Where Everything Lives</a>
+</nav>
+<p><em>What we built, every AWS service in it, why each one is there, how they connect, and
+when you'd use each of them again.</em></p>
+<p>Read this top to bottom once and you should be able to explain the whole platform to
+someone else — which is the real test of understanding it.</p>
+<hr />
+<h2 id="1-the-big-picture-what-is-this-thing">1. The Big Picture — What Is This Thing?</h2>
+<p>We built a <strong>streaming lakehouse with an AI layer</strong> for card-transaction fraud analytics:</p>
+<ul>
+<li><strong>Streaming</strong> — transactions arrive continuously as events, not as nightly file drops</li>
+<li><strong>Lakehouse</strong> — data lives cheaply in S3 like a <em>data lake</em>, but behaves like a
+  <em>warehouse</em>: typed tables, SQL, transactions, time travel</li>
+<li><strong>AI layer</strong> — two kinds: classic <strong>ML models</strong> that score each transaction for fraud,
+  and an <strong>LLM agent</strong> that lets anyone ask questions in English and get answers backed
+  by real SQL and cited documents</li>
+</ul>
+<pre><code>                        ┌─────────────────  THE DATA PLANE  ─────────────────┐
+ producer ──▶ Kinesis ──▶ Firehose ──▶ S3 raw/ ──▶ bronze ──▶ silver ──▶ gold
+ (events)    (stream)    (lander)     (files)     (typed)   (features)  (answers)
+                                                     │                    │
+                                                 quarantine          ML ensemble
+                                                 (bad rows)         (fraud scores)
+
+                        ┌──────────────  THE CONTROL PLANE  ─────────────────┐
+     EventBridge / S3-event ──▶ Step Functions ──▶ Glue jobs + quality gates
+                                     │
+                              SNS alerts + CloudWatch alarms/dashboard
+
+                        ┌───────────  THE INTELLIGENCE PLANE  ───────────────┐
+     you ──▶ FastAPI/MCP ──▶ LangGraph agent ──▶ Bedrock (Claude models)
+                                  │── SQL tool ──▶ validator ──▶ Athena ──▶ gold
+                                  │── policy tool ──▶ Knowledge Base ──▶ S3 Vectors
+                                  └── ops tool ──▶ Step Functions history
+
+                        ┌───────────  THE GOVERNANCE PLANE  ─────────────────┐
+     IAM (who may call APIs) · Lake Formation (who may see which columns)
+     CloudTrail (who did what) · Budgets (what it costs)
+</code></pre>
+<p><strong>Why anyone builds this:</strong> a company receiving events (payments, clicks, sensor
+readings, orders) needs to (a) keep them forever cheaply, (b) clean and enrich them
+reliably, (c) let analysts and models consume them, and (d) increasingly, let
+non-technical people query them in plain language. This architecture is the current
+industry-standard answer to all four, which is why its skill names appear in data
+engineering job descriptions verbatim.</p>
+<hr />
+<h2 id="2-the-journey-of-one-transaction">2. The Journey of One Transaction</h2>
+<p>The best way to understand the system is to follow a single swipe of a card through it:</p>
+<ol>
+<li><strong>Born</strong> — the producer creates a JSON event: who, where, how much, which merchant.</li>
+<li><strong>Streamed</strong> — it's written to <strong>Kinesis</strong>, partitioned by customer so one customer's
+   events stay in order (order is what makes "5 transactions in 10 minutes" detectable).</li>
+<li><strong>Landed</strong> — <strong>Firehose</strong> buffers a few thousand events and writes them as one
+   compressed file to <strong>S3</strong> under <code>raw/transactions/dt=2026-08-15/</code>. Raw is immutable
+   history: never edited, only appended, replayable forever.</li>
+<li><strong>Triggered</strong> — the S3 arrival fires a <strong>Lambda</strong>, which starts one <strong>Step Functions</strong>
+   execution (duplicate triggers collapse into one run via idempotent naming).</li>
+<li><strong>Typed</strong> — the <strong>bronze Glue job</strong> parses the JSON, enforces types, rejects broken
+   records to <code>quarantine/</code> <em>with the reason attached</em>, deduplicates, and MERGEs into an
+   <strong>Iceberg</strong> table. From here on, everything downstream can trust the schema.</li>
+<li><strong>Gated</strong> — <strong>Glue Data Quality</strong> evaluates ~14 rules (uniqueness, ranges,
+   referential integrity, freshness). A Lambda reads the verdict; a Choice state
+   branches. Fail → downstream is <em>skipped</em> (stale beats wrong) and <strong>SNS</strong> emails you.</li>
+<li><strong>Enriched</strong> — the <strong>silver job</strong> computes fraud features with window functions:
+   velocity counts, amount z-score vs. the customer's own history, geo-distance and
+   implied travel speed, device changes, merchant risk.</li>
+<li><strong>Aggregated</strong> — the <strong>gold job</strong> rolls silver into the tables people actually query:
+   daily fraud metrics by category/channel, per-merchant risk.</li>
+<li><strong>Scored</strong> — the <strong>ML job</strong> trains six models on silver features (LightGBM, XGBoost,
+   Random Forest, SVM, Isolation Forest, autoencoder), averages them into one
+   <code>ensemble_fraud_score</code> per transaction, and writes scores + honest holdout metrics
+   back to gold.</li>
+<li><strong>Asked about</strong> — you type <em>"which merchant category has the highest fraud loss?"</em>
+    into the console. The <strong>LangGraph agent</strong> routes to its SQL tool, a small <strong>Claude</strong>
+    model writes SQL, the <strong>validator</strong> proves it's a single read-only SELECT on
+    allowlisted tables, <strong>Athena</strong> runs it against gold, and a larger Claude model writes
+    the answer — with the SQL attached so you can check it.</li>
+</ol>
+<p>Every stage is restartable, idempotent, and observable. That's the whole design in one
+sentence.</p>
+<hr />
+<h2 id="3-service-by-service-what-why-and-when-you-d-use-it-again">3. Service by Service — What, Why, and When You'd Use It Again</h2>
+<p>Each entry: what the service <em>is</em> in general → the job it does <em>here</em> → what it
+connects to → <strong>when to reach for it in your future work</strong>.</p>
+<h3>Storage &amp; Table Layer</h3>
+<h4>Amazon S3</h4>
+<ul>
+<li><strong>What it is:</strong> infinitely scalable object storage — files with URLs, eleven 9s of
+  durability, pennies per GB.</li>
+<li><strong>Here:</strong> the single home of ALL data — raw JSON, Iceberg tables, quarantine, policy
+  PDFs, quality reports, Terraform state, Athena results. One bucket, prefixes as zones.</li>
+<li><strong>Connects to:</strong> literally everything; S3 is the hub every other service reads/writes.</li>
+<li><strong>Future use:</strong> the default answer for storing anything that is a file. Data lakes,
+  backups, static websites, model artifacts, logs. If data doesn't need millisecond
+  lookup by key, it probably belongs in S3.</li>
+<li><strong>Watch for:</strong> lifecycle rules (we expire raw/ at 30 days) — unbounded buckets grow
+  silently forever.</li>
+</ul>
+<h4>Apache Iceberg <em>(open table format, not an AWS service)</em></h4>
+<ul>
+<li><strong>What it is:</strong> a metadata layer that turns "a pile of Parquet files in S3" into a
+  real table: ACID transactions, schema evolution, snapshots, time travel, row-level
+  DELETE/MERGE.</li>
+<li><strong>Here:</strong> bronze/silver/gold are all Iceberg. It gave us three live demos: adding a
+  column with zero downtime, querying the table <em>as it was</em> before a change, and
+  deleting 146 poisoned rows with one SQL statement.</li>
+<li><strong>Connects to:</strong> written by Glue Spark jobs, registered in the Glue Data Catalog,
+  queried by Athena.</li>
+<li><strong>Future use:</strong> any time multiple engines must read/write the same S3-based tables
+  safely, or you need UPDATE/DELETE/MERGE on a lake, or auditors ask "what did the data
+  look like last Tuesday?" Competitors: Delta Lake (Databricks-centric), Hudi. Iceberg
+  is the most engine-neutral and the AWS-native pick.</li>
+</ul>
+<h4>AWS Glue Data Catalog</h4>
+<ul>
+<li><strong>What it is:</strong> a serverless metastore — the "phone book" that maps table names to
+  schemas and S3 locations, shared by every engine.</li>
+<li><strong>Here:</strong> four databases (<code>fraud_raw/bronze/silver/gold</code>). Iceberg self-registers its
+  tables; Athena and the agent's schema introspection both read from it. We deliberately
+  used <strong>partition projection</strong> on the raw table instead of paying for scheduled
+  crawlers.</li>
+<li><strong>Future use:</strong> you get it implicitly whenever you use Athena/Glue/EMR on AWS. The
+  lesson that transfers: <em>one shared catalog</em> is what prevents every team from
+  maintaining their own contradictory idea of the schema.</li>
+</ul>
+<h3>Ingestion Layer</h3>
+<h4>Amazon Kinesis Data Streams</h4>
+<ul>
+<li><strong>What it is:</strong> a managed, ordered, replayable event stream — AWS's Kafka equivalent.
+  Producers put records; consumers read them in order per partition key.</li>
+<li><strong>Here:</strong> the front door. Partition key = <code>customer_id</code>, which guarantees per-customer
+  ordering — the property the velocity features depend on.</li>
+<li><strong>Connects to:</strong> producer → Kinesis → Firehose.</li>
+<li><strong>Future use:</strong> whenever events must be <em>reacted to</em> or <em>fanned out</em> in near-real-time:
+  clickstreams, IoT, CDC feeds, live leaderboards. Choose <strong>on-demand mode</strong> until you
+  can prove steady throughput.</li>
+<li><strong>Why not Kafka/MSK:</strong> MSK bills per-cluster-hour whether or not traffic flows
+  (~hundreds/month floor). At small scale, Kinesis's per-request shape wins; at massive
+  scale with existing Kafka expertise, MSK becomes defensible. Being able to argue this
+  trade-off <em>is</em> the senior-engineer answer.</li>
+<li><strong>Watch for:</strong> even on-demand Kinesis has a small per-stream-hour charge (~$29/mo if
+  left up idle) — hence our <code>make stream-down</code> habit.</li>
+</ul>
+<h4>Amazon Data Firehose</h4>
+<ul>
+<li><strong>What it is:</strong> a zero-code "lander": buffers a stream and delivers it to S3 (or
+  Redshift/OpenSearch/HTTP) with batching, compression, and partitioned paths.</li>
+<li><strong>Here:</strong> Kinesis → 5 MB/300 s buffers → GZIP JSON → <code>raw/transactions/dt=…/</code>. The
+  <code>dt=</code> path pattern is what lets every downstream engine prune by date for free.</li>
+<li><strong>Future use:</strong> any "stream → files" hop where you'd otherwise write consumer code.
+  The buffering question it answers — <em>latency vs. file count</em> — exists in every
+  streaming system: small buffers = fresh data but thousands of tiny files that choke
+  Spark; big buffers = fewer files but staler data.</li>
+</ul>
+<h3>Processing Layer</h3>
+<h4>AWS Glue (Spark jobs)</h4>
+<ul>
+<li><strong>What it is:</strong> serverless Apache Spark — you submit a PySpark script, AWS provisions
+  workers, runs it, bills per second, tears down. No cluster to manage.</li>
+<li><strong>Here:</strong> five jobs (bronze/silver/gold/quality/ml), all capped at 2 small workers and
+  15 minutes. The transforms are <em>pure functions</em> tested locally — the Glue scripts are
+  thin wrappers. That separation is why we could test in seconds what takes minutes to
+  run in the cloud.</li>
+<li><strong>Connects to:</strong> reads/writes S3+Iceberg via the Catalog; orchestrated by Step
+  Functions; logs and metrics to CloudWatch.</li>
+<li><strong>Future use:</strong> batch/micro-batch transformation of data too big for pandas but not
+  worth a permanent cluster. If your data fits in pandas, use Lambda or a container; if
+  you need a long-lived tuned cluster, that's EMR.</li>
+<li><strong>Hard-won lessons:</strong> Glue ≈ Spark but not = (static configs before the session,
+  <code>F.nullif</code> unsupported, sklearn absent from the Spark runtime) — always expect one
+  round of cloud-only debugging after local tests pass.</li>
+</ul>
+<h4>AWS Glue Data Quality (DQDL)</h4>
+<ul>
+<li><strong>What it is:</strong> a rules language + engine that scores a dataset against declarative
+  expectations (completeness, uniqueness, ranges, freshness, custom SQL).</li>
+<li><strong>Here:</strong> the <em>gates</em> between layers. Bronze rules ask "is this structurally
+  trustworthy?", silver rules ask "did the feature computation actually work?" A failing
+  gate halts the pipeline — gold goes stale, never wrong.</li>
+<li><strong>Future use:</strong> any pipeline where bad data downstream is worse than no data
+  downstream (that's most pipelines). The transferable design: <em>quality checks as
+  gates with teeth</em>, not dashboards nobody reads. Alternatives: Great Expectations,
+  dbt tests, Soda.</li>
+</ul>
+<h4>AWS Lambda</h4>
+<ul>
+<li><strong>What it is:</strong> run a function on demand, millisecond billing, zero servers.</li>
+<li><strong>Here:</strong> four small functions, all "trigger and glue" — start the pipeline on S3
+  arrival, read a quality verdict, write a failure report, kick a KB re-index. The rule
+  we enforced: <strong>never heavy processing in Lambda</strong> — 15-minute limit, memory limits,
+  and cost make it wrong for data crunching.</li>
+<li><strong>Future use:</strong> event reactions, API backends, glue between services, cron-style
+  chores. The default compute for anything under a minute and under a GB.</li>
+</ul>
+<h3>Orchestration Layer</h3>
+<h4>AWS Step Functions</h4>
+<ul>
+<li><strong>What it is:</strong> a state-machine orchestrator: define steps, retries, branches, and
+  error handling as JSON; get a visual execution graph and full history.</li>
+<li><strong>Here:</strong> the conductor — bronze → gate → silver → gate → gold → ML, with exponential
+  backoff retries, per-stage catch blocks, a failure-report path, and the quality gates
+  as <em>visible forks</em>. The graph view IS the mental model of this backend.</li>
+<li><strong>Connects to:</strong> invokes Glue and Lambda; started by EventBridge/S3 events; its
+  history is read by the agent's <code>pipeline_status</code> tool.</li>
+<li><strong>Future use:</strong> multi-step workflows with failure semantics — order processing, data
+  pipelines, human-approval flows. If your process has "if X fails, do Y, then alert Z",
+  reach for it.</li>
+<li><strong>Why not Airflow:</strong> managed Airflow (MWAA) is an always-on environment
+  (~$350+/month). Step Functions is per-transition (free tier covered this project).
+  Airflow wins when you need complex scheduling semantics, big DAG ecosystems, or
+  backfills as a first-class concept.</li>
+</ul>
+<h4>Amazon EventBridge Scheduler</h4>
+<ul>
+<li><strong>What it is:</strong> serverless cron — invoke almost any AWS API on a schedule.</li>
+<li><strong>Here:</strong> the hourly pipeline trigger, <strong>disabled by default</strong> because an armed
+  schedule runs Glue every hour over possibly-zero new rows.</li>
+<li><strong>Future use:</strong> any recurring task; also EventBridge <em>rules</em> (the sibling feature)
+  route events between services — we used one to alert on Glue job state changes.</li>
+</ul>
+<h4>Amazon SNS</h4>
+<ul>
+<li><strong>What it is:</strong> publish/subscribe messaging — publish once, deliver to email, SMS,
+  Lambda, queues.</li>
+<li><strong>Here:</strong> the alert channel. Quality-gate failures, pipeline failures, and alarms all
+  publish to one topic that emails you.</li>
+<li><strong>Future use:</strong> whenever "something happened, tell N interested parties." Pairs with
+  SQS (queues) when consumers need durability and retry.</li>
+</ul>
+<h3>Analytics Layer</h3>
+<h4>Amazon Athena</h4>
+<ul>
+<li><strong>What it is:</strong> serverless SQL directly over S3 — no cluster, no loading; pay per TB
+  scanned.</li>
+<li><strong>Here:</strong> the query engine for everything — your console queries, the agent's
+  generated SQL, the failure-scenario demos, even row-level DELETEs on Iceberg. Guarded
+  by a workgroup with a <strong>1 GB per-query scan cap</strong> enforced server-side.</li>
+<li><strong>Future use:</strong> ad-hoc and BI-style SQL over lake data, log analysis, quick
+  exploration of any S3 dataset. The pricing shape means an idle analytics stack costs
+  $0 — revolutionary vs. warehouse clusters.</li>
+<li><strong>Why not Redshift:</strong> Redshift (even Serverless) has capacity floors and shines at
+  high-concurrency dashboard workloads over huge data. For "a few GB, queried
+  occasionally," Athena is strictly better.</li>
+</ul>
+<h3>AI / Intelligence Layer</h3>
+<h4>Amazon Bedrock (foundation models via Converse API)</h4>
+<ul>
+<li><strong>What it is:</strong> serverless access to foundation models (Claude, Titan, etc.) — no
+  GPUs, no endpoints to manage, pay per token.</li>
+<li><strong>Here:</strong> three models with deliberate tiering: <strong>Claude Haiku</strong> for routing and SQL
+  generation (structured, cheap, fast), <strong>Claude Sonnet</strong> only for final answer
+  synthesis, <strong>Titan Embeddings</strong> for the knowledge base. Every call caps <code>max_tokens</code>;
+  the agent loop hard-stops at 5 iterations.</li>
+<li><strong>Future use:</strong> any LLM feature inside an AWS-first company — chatbots, extraction,
+  summarization, agents. The transferable pattern is the tiering: <em>small model for
+  structure, large model for prose</em> — the single easiest 5–10x cost saver in LLM apps.</li>
+<li><strong>Gotchas we hit:</strong> Anthropic models need a one-time use-case form per account; model
+  IAM should name exact model ARNs so a config change can't silently 20x your per-token
+  cost.</li>
+</ul>
+<h4>Bedrock Knowledge Bases + S3 Vectors</h4>
+<ul>
+<li><strong>What it is:</strong> managed RAG — point it at documents in S3; it chunks, embeds, and
+  indexes them; you call <code>retrieve()</code> and get relevant passages with sources. S3 Vectors
+  is the vector store: embeddings in S3, per-request pricing, <strong>no idle compute</strong>.</li>
+<li><strong>Here:</strong> the fraud-policy corpus (chargeback tiers, monitoring thresholds). The
+  agent's <code>search_policies</code> tool retrieves passages and the answer cites them <code>[1]</code> —
+  a policy answer without a citation is just an assertion.</li>
+<li><strong>Future use:</strong> "chat with our documents" features. The vector-store decision is the
+  cost decision: OpenSearch Serverless idles at ~$175+/month <em>and famously outlives the
+  KB that created it</em>; S3 Vectors idles at ~$0. At huge scale/low latency, dedicated
+  vector DBs earn their keep — not before.</li>
+<li><strong>Gotcha we hit:</strong> S3 Vectors caps <em>filterable</em> metadata at 2 KB/vector and Bedrock
+  stores chunk text in metadata — every <code>AMAZON_BEDROCK_TEXT*</code> key must be declared
+  non-filterable or real documents fail ingestion.</li>
+</ul>
+<h4>Bedrock Guardrails</h4>
+<ul>
+<li><strong>What it is:</strong> a policy filter wrapped around model calls: PII masking, prompt-attack
+  detection, topic denial.</li>
+<li><strong>Here:</strong> inputs screened for prompt injection; outputs anonymize card numbers, SSNs,
+  names (masking, not blocking — a fraud tool that blocks every answer touching an
+  identifier is useless); a denied topic blocks individual-cardholder profiling.</li>
+<li><strong>Future use:</strong> any user-facing LLM feature. But remember the deeper lesson from our
+  SQL validator: guardrails are <em>one</em> layer — the real security control is
+  deterministic code (parse the SQL; scope the IAM) that doesn't rely on a model
+  behaving.</li>
+</ul>
+<h4>The pieces we built ourselves (the differentiators)</h4>
+<ul>
+<li><strong>SQL validator</strong> (<code>sqlglot</code> AST): treats the LLM as untrusted input. Exactly one
+  statement, SELECT-only anywhere in the tree, gold-tables-only including inside CTEs
+  and UNIONs, LIMIT injected. 52 adversarial tests. <em>Pattern to reuse: never execute
+  model-generated anything without a parser-level check.</em></li>
+<li><strong>LangGraph supervisor</strong>: explicit route → tool → synthesize loop with the iteration
+  cap enforced in code. <em>Pattern to reuse: when someone asks "what if the model loops
+  forever?", the answer should be a line of your code.</em></li>
+<li><strong>ML ensemble</strong>: six diverse models averaged; unsupervised members keep signal even if
+  labels lie; leakage guards throughout; metrics written to a queryable table. <em>Pattern
+  to reuse: models are pipeline stages with the same idempotency and observability
+  duties as any other job.</em></li>
+</ul>
+<h3>Serving Layer</h3>
+<h4>ECR + ECS Fargate (+ ALB)</h4>
+<ul>
+<li><strong>What they are:</strong> ECR = private Docker registry. Fargate = run containers without
+  managing servers, per-second billing. ALB = managed load balancer.</li>
+<li><strong>Here:</strong> the FastAPI console and MCP server are containerized (multi-stage, non-root,
+  ARM64 for ~20% cheaper compute) with <code>desired_count = 0</code> at rest — the service exists,
+  costs nothing, and a demo is one variable away. The ALB is opt-in because it bills
+  ~$16/month from the moment it exists <em>regardless of task count</em> — the classic trap.</li>
+<li><strong>Future use:</strong> Fargate is the default for containerized services without cluster
+  ops. The reusable judgment: know which pieces bill-at-rest (ALB, NAT) vs.
+  scale-to-zero (tasks).</li>
+</ul>
+<h4>Amazon EKS <em>(built, deliberately not left running)</em></h4>
+<ul>
+<li><strong>What it is:</strong> managed Kubernetes.</li>
+<li><strong>Here:</strong> a separate Terraform workspace with its own state, because the control plane
+  bills ~$73/month from the moment it exists. Manifests (Deployment/Service/HPA + Pod
+  Identity reusing the same IAM role as Fargate) are ready for a same-day demo.</li>
+<li><strong>Future use:</strong> EKS earns its floor when you need the Kubernetes <em>ecosystem</em> —
+  Helm charts, operators, multi-team clusters, portability requirements. For "run my
+  container," Fargate at $0-at-rest wins. Knowing <em>when not to use Kubernetes</em> is the
+  interview answer.</li>
+</ul>
+<h3>Governance &amp; Safety Layer</h3>
+<h4>AWS IAM</h4>
+<ul>
+<li><strong>What it is:</strong> who (users/roles) may call which APIs on which resources.</li>
+<li><strong>Here:</strong> one narrow role per component — Firehose can read one stream and write one
+  prefix; the agent can query one workgroup and read gold only; nobody has <code>*</code>. The
+  human operator is broad; the machine roles are narrow — that asymmetry is deliberate
+  and defensible.</li>
+<li><strong>Future use:</strong> every AWS project, day one. The transferable habit: write the policy
+  from "what does this component actually do?" not from "what makes the error go away."</li>
+</ul>
+<h4>AWS Lake Formation</h4>
+<ul>
+<li><strong>What it is:</strong> data-level permissions on top of IAM — table- and <strong>column-level</strong>
+  grants enforced by the catalog, with credential vending for S3 access.</li>
+<li><strong>Here:</strong> two personas prove it: <code>analyst</code> runs <code>SELECT *</code> and gets 14 columns;
+  <code>risk_analyst</code> runs the identical query and gets 16. The excluded columns don't
+  exist for the analyst, no matter what SQL they write.</li>
+<li><strong>Future use:</strong> multi-team lakes where different roles may see different slices of the
+  same tables — the compliance answer for PII columns.</li>
+<li><strong>The five lessons it taught us</strong> (all in the field guide): IAM admin ≠ LF admin; the
+  grandfathered allow-everyone default shadows your grants until revoked per table;
+  grant the pipeline explicitly <em>before</em> revoking defaults; register the prefix where
+  data actually lives; and even the administrator needs an explicit SELECT — <em>admins
+  govern, access is always explicit.</em></li>
+</ul>
+<h4>AWS CloudTrail</h4>
+<ul>
+<li><strong>What it is:</strong> the audit log — every API call, by whom, from where.</li>
+<li><strong>Here:</strong> one trail, with S3 <em>data events</em> scoped to the lake bucket only (account-wide
+  data events are the classic expensive mistake — every Athena result write becomes a
+  billable event).</li>
+<li><strong>Future use:</strong> on by default in any account you care about; required for any
+  compliance conversation.</li>
+</ul>
+<h4>CloudWatch (metrics, logs, alarms, dashboard)</h4>
+<ul>
+<li><strong>What it is:</strong> AWS's built-in observability: metric time series, log storage/search,
+  threshold alarms, dashboards.</li>
+<li><strong>Here:</strong> every job emits custom metrics (rows written, quarantine rate, DQ pass rate,
+  fraud-signal recall, ensemble AUC, agent tokens/latency); five alarms email on
+  failure or staleness — including the subtle one: freshness treats <em>missing data as
+  breaching</em>, because "the pipeline stopped entirely" emits nothing at all; ONE dashboard
+  puts pipeline and agent on the same pane, because "the agent gave a stale answer" and
+  "the pipeline didn't run" are the same incident.</li>
+<li><strong>Future use:</strong> every AWS workload. The reusable idea is <em>the system reports its own
+  health as data</em> — logs are for humans investigating; metrics are for machines
+  deciding.</li>
+</ul>
+<h3>Foundations</h3>
+<h4>Terraform (+ S3/DynamoDB remote state)</h4>
+<ul>
+<li><strong>What it is:</strong> infrastructure as code — declare resources in files; <code>plan</code> shows the
+  diff; <code>apply</code> makes reality match.</li>
+<li><strong>Here:</strong> ~90 resources across 9 modules and 3 workspaces, every cost-bearing item
+  behind a flag defaulting to cheap, tags applied globally so Cost Explorer can
+  attribute every cent. Remote state in S3 + a DynamoDB lock so state survives laptops.</li>
+<li><strong>Future use:</strong> any infrastructure you'll touch twice. Habits that transfer: <em>always
+  read the plan</em> (our reviews caught the stream resurrecting itself), plans are
+  single-use, state surgery (<code>state rm</code>) is a legitimate tool.</li>
+</ul>
+<h4>GitHub Actions (CI/CD)</h4>
+<ul>
+<li><strong>Here:</strong> lint → 145 local tests (the adversarial SQL suite runs separately so a
+  security regression is unmissable) → terraform validate → ARM64 image build → deploy,
+  authenticated via <strong>OIDC</strong> so no long-lived AWS keys sit in repo secrets.</li>
+<li><strong>Future use:</strong> every repo. OIDC-instead-of-keys is the pattern interviewers probe.</li>
+</ul>
+<hr />
+<h2 id="4-why-this-specific-shape-the-five-principles">4. Why This <em>Specific</em> Shape — The Five Principles</h2>
+<p>Strip away the service names and the architecture is five decisions. These transfer to
+every data platform you'll ever build:</p>
+<ol>
+<li>
+<p><strong>Sort every service by pricing shape before using it.</strong> Per-request (safe) /
+  scales-to-zero (verify) / hourly floor (needs justification + teardown plan). This
+  single habit is why two weeks of building cost ~$3. It's also why we rejected MSK,
+  MWAA, OpenSearch, Redshift, and NAT gateways — each fails the shape test at this
+  scale, and each rejection is an interview answer.</p>
+</li>
+<li>
+<p><strong>Medallion layering (raw → bronze → silver → gold).</strong> Each layer has one job and one
+  guarantee: raw = immutable history, bronze = typed and deduplicated, silver =
+  enriched, gold = consumable answers. Corollary we proved live: <em>fixes flow the same
+  direction as data</em> — cleaning bronze while raw stayed poisoned just re-imported the
+  poison.</p>
+</li>
+<li>
+<p><strong>Gates fail closed; downstream stays stale, never wrong.</strong> Bad data halts promotion
+  and alerts a human. An empty run is a failure (<code>RowCount &gt; 0</code>), because a green
+  pipeline over zero rows is the worst outcome — nothing alerts.</p>
+</li>
+<li>
+<p><strong>Idempotency everywhere, because at-least-once is reality.</strong> Kinesis redelivers,
+  Step Functions retries, humans re-run. Every write is MERGE-by-key or
+  overwrite-by-partition; we delivered the identical batch twice and row counts held to
+  the digit.</p>
+</li>
+<li>
+<p><strong>Deterministic code guards probabilistic components.</strong> The LLM proposes; the AST
+  validator disposes. The models score; leakage guards and holdout metrics keep the
+  scores honest. IAM is the second wall behind every first wall.</p>
+</li>
+</ol>
+<hr />
+<h2 id="5-when-should-i-use-x-the-future-scenarios-cheat-sheet">5. "When Should I Use X?" — The Future-Scenarios Cheat Sheet</h2>
+<table>
+<thead>
+<tr>
+<th>You're asked to…</th>
+<th>Reach for</th>
+<th>Because</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Store files/data cheaply forever</td>
+<td>S3 (+ lifecycle rules)</td>
+<td>The default substrate of AWS</td>
+</tr>
+<tr>
+<td>React to events in near-real-time</td>
+<td>Kinesis (+ Lambda or Firehose)</td>
+<td>Ordered, replayable, per-request</td>
+</tr>
+<tr>
+<td>Get streaming data into files with no code</td>
+<td>Firehose</td>
+<td>Buffering/partitioning solved for you</td>
+</tr>
+<tr>
+<td>Transform data too big for pandas, no cluster wanted</td>
+<td>Glue Spark jobs</td>
+<td>Serverless Spark, per-second billing</td>
+</tr>
+<tr>
+<td>Give lake tables ACID/UPDATE/time-travel</td>
+<td>Iceberg</td>
+<td>Engine-neutral, AWS-native support</td>
+</tr>
+<tr>
+<td>SQL over S3 without loading anything</td>
+<td>Athena</td>
+<td>Pay per query; $0 idle</td>
+</tr>
+<tr>
+<td>Orchestrate multi-step work with retries/branching</td>
+<td>Step Functions</td>
+<td>Failure handling as config + visual history</td>
+</tr>
+<tr>
+<td>Small glue logic between services</td>
+<td>Lambda</td>
+<td>Millisecond billing, zero servers</td>
+</tr>
+<tr>
+<td>Stop bad data from propagating</td>
+<td>Glue DQ (or dbt tests/GE) as a <em>gate</em></td>
+<td>Checks with teeth, not dashboards</td>
+</tr>
+<tr>
+<td>Add an LLM feature in an AWS shop</td>
+<td>Bedrock, tiered models, capped tokens</td>
+<td>Serverless models; tiering is the cost lever</td>
+</tr>
+<tr>
+<td>"Chat with our documents"</td>
+<td>Bedrock KB + S3 Vectors</td>
+<td>Managed RAG with no idle vector bill</td>
+</tr>
+<tr>
+<td>Let an LLM touch a database</td>
+<td>A parser-level validator + scoped IAM</td>
+<td>Never trust generated code without proof</td>
+</tr>
+<tr>
+<td>Score events with ML in a pipeline</td>
+<td>Ensemble as a pipeline stage, metrics to a table</td>
+<td>Models are jobs with the same duties as ETL</td>
+</tr>
+<tr>
+<td>Different people see different columns</td>
+<td>Lake Formation</td>
+<td>Enforced at the catalog, survives SELECT *</td>
+</tr>
+<tr>
+<td>Run a container cheaply</td>
+<td>Fargate, desired_count 0 at rest</td>
+<td>Kubernetes only when you need its ecosystem</td>
+</tr>
+<tr>
+<td>Any infrastructure at all</td>
+<td>Terraform, cost flags default-off</td>
+<td>Read the plan. Every time.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="6-where-everything-lives">6. Where Everything Lives</h2>
+<table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>The measured results of every live run</td>
+<td><code>docs/as-run-results.md</code></td>
+</tr>
+<tr>
+<td>All 30 issues + fixes + lessons</td>
+<td><code>docs/troubleshooting-guide.html</code></td>
+</tr>
+<tr>
+<td>Why each design decision beat its alternative</td>
+<td><code>docs/decisions.md</code> (D-001…D-012)</td>
+</tr>
+<tr>
+<td>How this project's internals work</td>
+<td><code>docs/how-it-works.md</code></td>
+</tr>
+<tr>
+<td>AWS-from-zero setup walkthrough</td>
+<td><code>docs/aws-getting-started.md</code></td>
+</tr>
+<tr>
+<td>Reproducible failure drills</td>
+<td><code>docs/failure-scenarios.md</code></td>
+</tr>
+<tr>
+<td>Project rules &amp; cost guardrails</td>
+<td><code>docs/PROJECT_RULES.md</code></td>
+</tr>
+</tbody>
+</table>
+<p><em>One honest closing note, consistent with everything in this repo: the data is
+synthetic and its features were engineered to catch the injected fraud patterns. Every
+skill here is real; the AUC numbers describe the demo, not production. Saying that
+unprompted is worth more than the numbers.</em></p>
+<footer>Companion: <code>visual-guide.html</code> for the animated walkthrough ·
+<code>troubleshooting-guide.html</code> for all 30 issues · generated from the live build
+of fraud-lake, August 2026.</footer>
+</div>
+</body>
+</html>

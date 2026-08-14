@@ -1,0 +1,498 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>fraud-lake — Animated Visual Guide</title>
+<style>
+:root {
+  --bg:#0e1116; --panel:#161a21; --ink:#e8e6e0; --muted:#8b93a1; --line:#2a303b;
+  --teal:#3fd0b0; --amber:#ffb454; --red:#ff6b63; --blue:#6aa9ff; --violet:#b98bff;
+  --green:#69db7c;
+}
+* { box-sizing:border-box; margin:0; }
+body { background:var(--bg); color:var(--ink);
+  font:16px/1.6 "Avenir Next", "Segoe UI", system-ui, sans-serif; padding-bottom:100px; }
+.wrap { max-width:980px; margin:0 auto; padding:0 20px; }
+
+header { padding:54px 0 8px; }
+.kicker { font:12px ui-monospace,Menlo,monospace; letter-spacing:.22em; color:var(--teal); text-transform:uppercase; }
+h1 { font-size:38px; margin:10px 0 10px; font-weight:800; }
+.lede { color:var(--muted); font-size:18px; max-width:720px; }
+
+section { margin-top:64px; }
+.scene {
+  background:var(--panel); border:1px solid var(--line); border-radius:16px;
+  padding:26px 26px 22px; overflow:hidden;
+}
+h2 { font-size:24px; margin-bottom:4px; }
+h2 .num { color:var(--teal); font-family:ui-monospace,Menlo,monospace; font-size:16px; margin-right:8px; }
+.sub { color:var(--muted); margin-bottom:18px; font-size:15px; }
+.controls { display:flex; gap:10px; margin:14px 0 4px; flex-wrap:wrap; }
+button {
+  font:13px ui-monospace,Menlo,monospace; padding:8px 18px; border-radius:999px;
+  border:1px solid var(--line); background:#1d232d; color:var(--ink); cursor:pointer;
+  transition:all .15s;
+}
+button:hover { border-color:var(--teal); color:var(--teal); }
+button.primary { background:var(--teal); color:#08211b; border-color:var(--teal); font-weight:700; }
+button.danger { border-color:var(--red); color:var(--red); }
+button.danger:hover { background:rgba(255,107,99,.12); }
+svg { width:100%; height:auto; display:block; }
+text { font-family:"Avenir Next","Segoe UI",system-ui,sans-serif; }
+.mono { font-family:ui-monospace,Menlo,monospace; }
+.caption {
+  min-height:44px; margin-top:10px; padding:10px 16px; border-radius:10px;
+  background:#10141a; border:1px solid var(--line); color:var(--ink); font-size:15px;
+  transition:border-color .3s;
+}
+.caption b { color:var(--teal); }
+.legend { display:flex; gap:18px; flex-wrap:wrap; margin-top:12px; font-size:13px; color:var(--muted); }
+.legend span::before { content:"●"; margin-right:6px; }
+.lg-teal::before { color:var(--teal); } .lg-amber::before { color:var(--amber); }
+.lg-red::before { color:var(--red); } .lg-blue::before { color:var(--blue); }
+.lg-violet::before { color:var(--violet); } .lg-green::before { color:var(--green); }
+
+/* shared svg element styles */
+.node rect, .node circle { fill:#1d232d; stroke:var(--line); stroke-width:1.5; transition:all .3s; }
+.node text { fill:var(--ink); font-size:13px; font-weight:600; }
+.node .tag { fill:var(--muted); font-size:10px; font-weight:400; }
+.node.active rect, .node.active circle { stroke:var(--teal); stroke-width:2.5; filter:drop-shadow(0 0 8px rgba(63,208,176,.5)); }
+.node.bad rect { stroke:var(--red); filter:drop-shadow(0 0 8px rgba(255,107,99,.5)); }
+.node.done rect { stroke:var(--green); }
+.pipe { stroke:var(--line); stroke-width:2; fill:none; transition:stroke .3s; }
+.pipe.hot { stroke:var(--teal); }
+.pipe.badpath { stroke:var(--red); }
+.packet { filter:drop-shadow(0 0 6px currentColor); }
+.pulse { animation:pulse 1.6s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity:.45; } }
+.spin { transform-origin:center; animation:spin 3s linear infinite; }
+@keyframes spin { to { transform:rotate(360deg); } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="kicker">fraud-lake · visual guide</div>
+  <h1>See the System Run</h1>
+  <p class="lede">Five animated scenes. Press play on each and watch the actual mechanics:
+  a transaction crossing the platform, the quality gate doing its job, the AI agent's loop,
+  the six-model ensemble, and why the bill stays near zero. Every scene matches the real
+  deployed system.</p>
+</header>
+
+<!-- ═══════════════════════ SCENE 1 : THE JOURNEY ═══════════════════════ -->
+<section>
+<div class="scene">
+<h2><span class="num">01</span>The Journey of a Transaction</h2>
+<p class="sub">One card swipe, born on the left, becoming an answerable fact on the right.</p>
+
+<svg viewBox="0 0 960 300" id="s1">
+  <!-- pipes -->
+  <path class="pipe" id="s1p" d="M 88 84 H 180 M 268 84 H 356 M 444 84 H 500 C 540 84 540 84 540 130 L 540 170 C 540 216 540 216 500 216 L 88 216 M 88 216"/>
+  <path class="pipe" d="M 88 84 H 180"/><path class="pipe" d="M 268 84 H 356"/>
+  <path class="pipe" d="M 444 84 H 532"/><path class="pipe" d="M 620 84 H 708"/>
+  <path class="pipe" d="M 796 84 H 850"/>
+  <path class="pipe" d="M 884 116 V 152"/>
+  <path class="pipe" d="M 850 184 H 796 M 708 184 H 620 M 532 184 H 444"/>
+  <!-- top row nodes -->
+  <g class="node" id="s1n0"><rect x="8" y="60" width="80" height="48" rx="9"/><text x="48" y="80" text-anchor="middle">producer</text><text x="48" y="96" text-anchor="middle" class="tag">event born</text></g>
+  <g class="node" id="s1n1"><rect x="180" y="60" width="88" height="48" rx="9"/><text x="224" y="80" text-anchor="middle">Kinesis</text><text x="224" y="96" text-anchor="middle" class="tag">ordered stream</text></g>
+  <g class="node" id="s1n2"><rect x="356" y="60" width="88" height="48" rx="9"/><text x="400" y="80" text-anchor="middle">Firehose</text><text x="400" y="96" text-anchor="middle" class="tag">buffer 5MB/300s</text></g>
+  <g class="node" id="s1n3"><rect x="532" y="60" width="88" height="48" rx="9"/><text x="576" y="80" text-anchor="middle">S3 raw/</text><text x="576" y="96" text-anchor="middle" class="tag">immutable</text></g>
+  <g class="node" id="s1n4"><rect x="708" y="60" width="88" height="48" rx="9"/><text x="752" y="80" text-anchor="middle">Lambda</text><text x="752" y="96" text-anchor="middle" class="tag">S3 trigger</text></g>
+  <g class="node" id="s1n5"><rect x="850" y="60" width="100" height="48" rx="9"/><text x="900" y="80" text-anchor="middle">Step Fns</text><text x="900" y="96" text-anchor="middle" class="tag">orchestrator</text></g>
+  <!-- bottom row nodes (right to left flow) -->
+  <g class="node" id="s1n6"><rect x="850" y="160" width="100" height="48" rx="9"/><text x="900" y="180" text-anchor="middle">bronze</text><text x="900" y="196" text-anchor="middle" class="tag">typed + dedup</text></g>
+  <g class="node" id="s1n7"><rect x="708" y="160" width="88" height="48" rx="9"/><text x="752" y="180" text-anchor="middle">DQ gate</text><text x="752" y="196" text-anchor="middle" class="tag">14 rules</text></g>
+  <g class="node" id="s1n8"><rect x="532" y="160" width="88" height="48" rx="9"/><text x="576" y="180" text-anchor="middle">silver</text><text x="576" y="196" text-anchor="middle" class="tag">fraud features</text></g>
+  <g class="node" id="s1n9"><rect x="356" y="160" width="88" height="48" rx="9"/><text x="400" y="180" text-anchor="middle">gold</text><text x="400" y="196" text-anchor="middle" class="tag">aggregates</text></g>
+  <g class="node" id="s1n10"><rect x="180" y="160" width="88" height="48" rx="9"/><text x="224" y="180" text-anchor="middle">ML</text><text x="224" y="196" text-anchor="middle" class="tag">6-model score</text></g>
+  <g class="node" id="s1n11"><rect x="8" y="160" width="80" height="48" rx="9"/><text x="48" y="180" text-anchor="middle">agent</text><text x="48" y="196" text-anchor="middle" class="tag">ask anything</text></g>
+  <!-- connecting pipes top->bottom on right -->
+  <path class="pipe" d="M 900 108 V 160" id="s1vert"/>
+  <path class="pipe" d="M 850 184 H 796"/><path class="pipe" d="M 708 184 H 620 M 620 184 H 620"/>
+  <path class="pipe" d="M 620 184 H 620"/>
+  <path class="pipe" d="M 532 184 H 444"/><path class="pipe" d="M 356 184 H 268"/>
+  <path class="pipe" d="M 180 184 H 88"/>
+  <!-- the packet -->
+  <circle id="s1packet" class="packet" r="7" fill="#3fd0b0" color="#3fd0b0" cx="48" cy="84" opacity="0"/>
+</svg>
+
+<div class="controls">
+  <button class="primary" onclick="scene1()">▶ Play the journey</button>
+</div>
+<div class="caption" id="s1cap">Press play — and watch one transaction travel the whole platform.</div>
+</div>
+</section>
+
+<!-- ═══════════════════════ SCENE 2 : THE GATE ═══════════════════════ -->
+<section>
+<div class="scene">
+<h2><span class="num">02</span>The Quality Gate — Stale Beats Wrong</h2>
+<p class="sub">Run both batches. Watch what reaches gold — and what never does.</p>
+
+<svg viewBox="0 0 960 330" id="s2">
+  <g class="node" id="s2raw"><rect x="20" y="130" width="110" height="52" rx="9"/><text x="75" y="152" text-anchor="middle">raw batch</text><text x="75" y="169" text-anchor="middle" class="tag" id="s2rawtag">2,900 records</text></g>
+  <path class="pipe" id="s2p1" d="M 130 156 H 220"/>
+  <g class="node" id="s2bronze"><rect x="220" y="130" width="110" height="52" rx="9"/><text x="275" y="152" text-anchor="middle">bronze job</text><text x="275" y="169" text-anchor="middle" class="tag">type + validate</text></g>
+  <path class="pipe" id="s2pq" d="M 275 182 V 250"/>
+  <g class="node" id="s2quar"><rect x="205" y="250" width="140" height="50" rx="9"/><text x="275" y="271" text-anchor="middle">quarantine/</text><text x="275" y="287" text-anchor="middle" class="tag" id="s2quartag">+ rejection reasons</text></g>
+  <path class="pipe" id="s2p2" d="M 330 156 H 430"/>
+  <g class="node" id="s2gate"><rect x="430" y="122" width="120" height="68" rx="34"/><text x="490" y="150" text-anchor="middle">DQ GATE</text><text x="490" y="168" text-anchor="middle" class="tag" id="s2gatetag">14 rules</text></g>
+  <path class="pipe" id="s2pass" d="M 550 146 C 610 146 610 96 670 96"/>
+  <path class="pipe" id="s2fail" d="M 550 168 C 610 168 610 240 670 240"/>
+  <g class="node" id="s2silver"><rect x="670" y="46" width="100" height="48" rx="9"/><text x="720" y="66" text-anchor="middle">silver</text><text x="720" y="82" text-anchor="middle" class="tag">features</text></g>
+  <path class="pipe" id="s2pg" d="M 770 70 H 830"/>
+  <g class="node" id="s2gold"><rect x="830" y="46" width="100" height="48" rx="9"/><text x="880" y="66" text-anchor="middle">gold</text><text x="880" y="82" text-anchor="middle" class="tag" id="s2goldtag">fresh ✓</text></g>
+  <g class="node" id="s2report"><rect x="670" y="214" width="120" height="52" rx="9"/><text x="730" y="235" text-anchor="middle">failure report</text><text x="730" y="252" text-anchor="middle" class="tag">S3 + SNS email</text></g>
+  <g class="node" id="s2stale"><rect x="820" y="214" width="120" height="52" rx="9"/><text x="880" y="235" text-anchor="middle">gold untouched</text><text x="880" y="252" text-anchor="middle" class="tag">stale, never wrong</text></g>
+  <circle id="s2packet" class="packet" r="7" fill="#3fd0b0" color="#3fd0b0" cx="75" cy="156" opacity="0"/>
+</svg>
+
+<div class="controls">
+  <button class="primary" onclick="scene2(false)">▶ Clean batch</button>
+  <button class="danger" onclick="scene2(true)">▶ Corrupted batch (35% poison)</button>
+</div>
+<div class="caption" id="s2cap">This is the exact fork we screenshot in the Step Functions console — and the design the whole pipeline is built around.</div>
+<div class="legend"><span class="lg-teal">healthy flow</span><span class="lg-red">failure path (by design)</span></div>
+</div>
+</section>
+
+<!-- ═══════════════════════ SCENE 3 : THE AGENT LOOP ═══════════════════════ -->
+<section>
+<div class="scene">
+<h2><span class="num">03</span>The AI Agent — Route, Act, Answer</h2>
+<p class="sub">Ask a question type; watch the supervisor route it, run the tool, and synthesize — with the iteration cap standing guard.</p>
+
+<svg viewBox="0 0 960 340" id="s3">
+  <g class="node" id="s3q"><rect x="20" y="140" width="110" height="52" rx="9"/><text x="75" y="162" text-anchor="middle">question</text><text x="75" y="179" text-anchor="middle" class="tag">plain English</text></g>
+  <path class="pipe" id="s3p1" d="M 130 166 H 230"/>
+  <g class="node" id="s3route"><circle cx="295" cy="166" r="52"/><text x="295" y="160" text-anchor="middle">route_query</text><text x="295" y="178" text-anchor="middle" class="tag">Claude Haiku</text></g>
+  <path class="pipe" id="s3psql" d="M 335 130 C 400 80 430 80 470 80"/>
+  <path class="pipe" id="s3ppol" d="M 347 166 H 470"/>
+  <path class="pipe" id="s3pops" d="M 335 202 C 400 252 430 252 470 252"/>
+  <g class="node" id="s3sql"><rect x="470" y="52" width="150" height="56" rx="9"/><text x="545" y="74" text-anchor="middle">query_lakehouse</text><text x="545" y="92" text-anchor="middle" class="tag">SQL → validator → Athena</text></g>
+  <g class="node" id="s3pol"><rect x="470" y="138" width="150" height="56" rx="9"/><text x="545" y="160" text-anchor="middle">search_policies</text><text x="545" y="178" text-anchor="middle" class="tag">KB on S3 Vectors</text></g>
+  <g class="node" id="s3ops"><rect x="470" y="224" width="150" height="56" rx="9"/><text x="545" y="246" text-anchor="middle">pipeline_status</text><text x="545" y="264" text-anchor="middle" class="tag">Step Fns history</text></g>
+  <path class="pipe" id="s3loop" d="M 620 166 C 680 166 680 300 295 300 C 260 300 250 260 262 218" stroke-dasharray="6 6"/>
+  <text x="455" y="320" text-anchor="middle" fill="#8b93a1" font-size="12" class="mono" id="s3itertxt">loop — MAX_ITERATIONS = 5, enforced in code</text>
+  <path class="pipe" id="s3p2" d="M 620 80 C 700 80 710 120 745 148 M 620 166 H 745 M 620 252 C 700 252 710 212 745 184"/>
+  <g class="node" id="s3syn"><rect x="745" y="138" width="120" height="56" rx="9"/><text x="805" y="160" text-anchor="middle">synthesize</text><text x="805" y="178" text-anchor="middle" class="tag">Claude Sonnet</text></g>
+  <path class="pipe" id="s3p3" d="M 865 166 H 900"/>
+  <g class="node" id="s3ans"><rect x="900" y="140" width="52" height="52" rx="9"/><text x="926" y="172" text-anchor="middle" font-size="22">💬</text></g>
+  <circle id="s3packet" class="packet" r="7" fill="#6aa9ff" color="#6aa9ff" cx="75" cy="166" opacity="0"/>
+</svg>
+
+<div class="controls">
+  <button class="primary" onclick="scene3('sql')">▶ “fraud rate by day?”</button>
+  <button onclick="scene3('pol')">▶ “what does policy say?”</button>
+  <button onclick="scene3('ops')">▶ “did the pipeline run?”</button>
+</div>
+<div class="caption" id="s3cap">Small model decides <b>where</b>; tools do the work; big model writes the answer. Every answer ships with the SQL or citations that produced it.</div>
+</div>
+</section>
+
+<!-- ═══════════════════════ SCENE 4 : THE ENSEMBLE ═══════════════════════ -->
+<section>
+<div class="scene">
+<h2><span class="num">04</span>The Six-Model Ensemble</h2>
+<p class="sub">One transaction's features fan out to six very different learners; their votes average into one score.</p>
+
+<svg viewBox="0 0 960 360" id="s4">
+  <g class="node" id="s4x"><rect x="20" y="146" width="130" height="60" rx="9"/><text x="85" y="170" text-anchor="middle">silver features</text><text x="85" y="188" text-anchor="middle" class="tag">velocity · z-score · geo…</text></g>
+  <g id="s4fan">
+    <path class="pipe" d="M 150 176 C 220 176 220 40 300 40"/>
+    <path class="pipe" d="M 150 176 C 220 176 220 96 300 96"/>
+    <path class="pipe" d="M 150 176 C 220 176 220 152 300 152"/>
+    <path class="pipe" d="M 150 176 C 220 176 220 208 300 208"/>
+    <path class="pipe" d="M 150 176 C 220 176 220 264 300 264"/>
+    <path class="pipe" d="M 150 176 C 220 176 220 320 300 320"/>
+  </g>
+  <g class="node s4m" id="s4m0"><rect x="300" y="20" width="170" height="40" rx="8"/><text x="385" y="38" text-anchor="middle">LightGBM</text><text x="385" y="53" text-anchor="middle" class="tag">boosted trees · supervised</text></g>
+  <g class="node s4m" id="s4m1"><rect x="300" y="76" width="170" height="40" rx="8"/><text x="385" y="94" text-anchor="middle">XGBoost</text><text x="385" y="109" text-anchor="middle" class="tag">boosted trees · supervised</text></g>
+  <g class="node s4m" id="s4m2"><rect x="300" y="132" width="170" height="40" rx="8"/><text x="385" y="150" text-anchor="middle">Random Forest</text><text x="385" y="165" text-anchor="middle" class="tag">bagged trees · supervised</text></g>
+  <g class="node s4m" id="s4m3"><rect x="300" y="188" width="170" height="40" rx="8"/><text x="385" y="206" text-anchor="middle">SVM (RBF)</text><text x="385" y="221" text-anchor="middle" class="tag">margin geometry · supervised</text></g>
+  <g class="node s4m" id="s4m4"><rect x="300" y="244" width="170" height="40" rx="8"/><text x="385" y="262" text-anchor="middle">Isolation Forest</text><text x="385" y="277" text-anchor="middle" class="tag">unsupervised · isolatability</text></g>
+  <g class="node s4m" id="s4m5"><rect x="300" y="300" width="170" height="40" rx="8"/><text x="385" y="318" text-anchor="middle">Autoencoder 32→8→32</text><text x="385" y="333" text-anchor="middle" class="tag">unsupervised · reconstruction</text></g>
+  <g id="s4merge">
+    <path class="pipe" d="M 470 40 C 560 40 560 176 640 176"/>
+    <path class="pipe" d="M 470 96 C 560 96 560 176 640 176"/>
+    <path class="pipe" d="M 470 152 C 560 152 560 176 640 176"/>
+    <path class="pipe" d="M 470 208 C 560 208 560 176 640 176"/>
+    <path class="pipe" d="M 470 264 C 560 264 560 176 640 176"/>
+    <path class="pipe" d="M 470 320 C 560 320 560 176 640 176"/>
+  </g>
+  <text id="s4v0" x="510" y="34" class="mono" font-size="12" fill="#3fd0b0" opacity="0">0.00</text>
+  <text id="s4v1" x="510" y="90" class="mono" font-size="12" fill="#3fd0b0" opacity="0">0.00</text>
+  <text id="s4v2" x="510" y="146" class="mono" font-size="12" fill="#3fd0b0" opacity="0">0.00</text>
+  <text id="s4v3" x="510" y="202" class="mono" font-size="12" fill="#3fd0b0" opacity="0">0.00</text>
+  <text id="s4v4" x="510" y="258" class="mono" font-size="12" fill="#ffb454" opacity="0">0.00</text>
+  <text id="s4v5" x="510" y="314" class="mono" font-size="12" fill="#ffb454" opacity="0">0.00</text>
+  <g class="node" id="s4avg"><circle cx="690" cy="176" r="50"/><text x="690" y="170" text-anchor="middle">mean</text><text x="690" y="188" text-anchor="middle" class="tag">equal weights</text></g>
+  <path class="pipe" id="s4pout" d="M 740 176 H 800"/>
+  <g class="node" id="s4out"><rect x="800" y="140" width="150" height="72" rx="10"/>
+    <text x="875" y="164" text-anchor="middle">ensemble score</text>
+    <text id="s4score" x="875" y="192" text-anchor="middle" class="mono" font-size="22" fill="#3fd0b0">—</text></g>
+  <text x="875" y="232" text-anchor="middle" class="mono" font-size="11" fill="#8b93a1" id="s4verdict"></text>
+</svg>
+
+<div class="controls">
+  <button class="primary" onclick="scene4(false)">▶ Score a normal transaction</button>
+  <button class="danger" onclick="scene4(true)">▶ Score a velocity-burst fraud</button>
+</div>
+<div class="caption" id="s4cap">Six different opinions beat one confident one. The two amber models never saw a fraud label — they keep working even if labels are wrong.</div>
+<div class="legend"><span class="lg-teal">supervised probability</span><span class="lg-amber">unsupervised anomaly score</span></div>
+</div>
+</section>
+
+<!-- ═══════════════════════ SCENE 5 : THE BILL ═══════════════════════ -->
+<section>
+<div class="scene">
+<h2><span class="num">05</span>Why the Bill Stays Near Zero</h2>
+<p class="sub">Every service sorted by pricing shape — the single habit behind “two weeks of building ≈ $3”.</p>
+
+<svg viewBox="0 0 960 330" id="s5">
+  <text x="160" y="30" text-anchor="middle" font-weight="700" fill="#69db7c" font-size="15">PER-REQUEST · $0 idle</text>
+  <text x="160" y="48" text-anchor="middle" font-size="11" fill="#8b93a1">use freely</text>
+  <text x="480" y="30" text-anchor="middle" font-weight="700" fill="#ffb454" font-size="15">SCALES TO ZERO</text>
+  <text x="480" y="48" text-anchor="middle" font-size="11" fill="#8b93a1">verify the config</text>
+  <text x="800" y="30" text-anchor="middle" font-weight="700" fill="#ff6b63" font-size="15">HOURLY FLOOR</text>
+  <text x="800" y="48" text-anchor="middle" font-size="11" fill="#8b93a1">justify + teardown plan</text>
+  <line x1="320" y1="20" x2="320" y2="310" stroke="#2a303b"/>
+  <line x1="640" y1="20" x2="640" y2="310" stroke="#2a303b"/>
+  <g id="s5col0"></g><g id="s5col1"></g><g id="s5col2"></g>
+</svg>
+
+<div class="controls">
+  <button class="primary" onclick="scene5()">▶ Sort the services</button>
+</div>
+<div class="caption" id="s5cap">Green column: create freely. Amber: free <b>if configured right</b> (count 0, disabled). Red: bills every hour it exists — our red items are torn down same-day or gated off.</div>
+</div>
+</section>
+
+<footer style="margin-top:70px;color:var(--muted);font-size:14px;border-top:1px solid var(--line);padding-top:18px">
+Companion: <span class="mono">complete-system-guide.html</span> for the full written reference ·
+every scene mirrors the deployed fraud-lake system, August 2026.
+</footer>
+</div>
+
+<script>
+/* ------------------------------------------------ tiny animation helpers */
+const $ = (id) => document.getElementById(id);
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+let running = {};
+
+async function movePacket(packet, path, ms) {
+  // Time-based with a setInterval driver rather than requestAnimationFrame:
+  // browsers freeze rAF entirely in hidden tabs, which would hang the async
+  // scene scripts mid-await. An interval still fires (throttled), so the
+  // animation always completes even if the tab was backgrounded.
+  const len = path.getTotalLength();
+  packet.setAttribute("opacity", 1);
+  const t0 = performance.now();
+  return new Promise(resolve => {
+    const timer = setInterval(() => {
+      const k = Math.min((performance.now() - t0) / ms, 1);
+      const p = path.getPointAtLength(len * k);
+      packet.setAttribute("cx", p.x); packet.setAttribute("cy", p.y);
+      if (k >= 1) { clearInterval(timer); resolve(); }
+    }, 16);
+  });
+}
+function mkpath(d, svg) {
+  const p = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  p.setAttribute("d", d); p.setAttribute("fill", "none");
+  svg.appendChild(p); return p;
+}
+function setCap(id, html) { $(id).innerHTML = html; }
+function clearStates(prefix, n, cls) {
+  for (let i = 0; i <= n; i++) { const el = $(prefix + i); if (el) el.classList.remove("active","bad","done"); }
+}
+
+/* ------------------------------------------------ scene 1: the journey */
+const S1 = [
+  ["s1n0","A transaction is <b>born</b>: who, where, how much, which merchant — one JSON event."],
+  ["s1n1","<b>Kinesis</b> receives it, partitioned by customer — so this customer's events stay in order."],
+  ["s1n2","<b>Firehose</b> buffers ~5 minutes of events into one compressed file. No code involved."],
+  ["s1n3","It lands in <b>S3 raw/</b> under dt=today — immutable history, replayable forever."],
+  ["s1n4","The S3 arrival fires a <b>Lambda</b>, which starts exactly one pipeline run (duplicates collapse)."],
+  ["s1n5","<b>Step Functions</b> takes over: the conductor with retries, catches, and the visual graph."],
+  ["s1n6","The <b>bronze job</b> types every field, quarantines broken records with reasons, dedupes, MERGEs into Iceberg."],
+  ["s1n7","The <b>quality gate</b> checks 14 rules. Only proven data continues."],
+  ["s1n8","The <b>silver job</b> computes fraud features: velocity, z-scores, impossible travel, device changes."],
+  ["s1n9","The <b>gold job</b> aggregates into the tables people and agents actually query."],
+  ["s1n10","The <b>ML ensemble</b> scores every transaction for fraud — six models, one score."],
+  ["s1n11","And now <b>anyone can ask</b>: the agent answers in English, backed by real SQL. Journey complete. 🏁"],
+];
+async function scene1() {
+  if (running.s1) return; running.s1 = true;
+  const svg = $("s1"), packet = $("s1packet");
+  clearStates("s1n", 11);
+  const stops = [[48,84],[224,84],[400,84],[576,84],[752,84],[900,84],[900,184],[752,184],[576,184],[400,184],[224,184],[48,184]];
+  packet.setAttribute("cx",48); packet.setAttribute("cy",84);
+  for (let i = 0; i < S1.length; i++) {
+    if (i > 0) {
+      const [x0,y0] = stops[i-1], [x1,y1] = stops[i];
+      const d = (y0 === y1) ? `M ${x0} ${y0} H ${x1}` : `M ${x0} ${y0} C ${x0+55} ${y0} ${x1+55} ${y1} ${x1} ${y1}`;
+      const p = mkpath(d, svg); await movePacket(packet, p, 650); p.remove();
+      $("s1n"+(i-1)).classList.remove("active"); $("s1n"+(i-1)).classList.add("done");
+    }
+    $("s1n"+i).classList.add("active");
+    setCap("s1cap", `<b>${i+1}/12</b> — ` + S1[i][1]);
+    await sleep(1500);
+  }
+  $("s1n11").classList.add("done");
+  packet.setAttribute("opacity", 0); running.s1 = false;
+}
+
+/* ------------------------------------------------ scene 2: the gate */
+async function scene2(corrupt) {
+  if (running.s2) return; running.s2 = true;
+  const svg = $("s2"), packet = $("s2packet");
+  ["s2raw","s2bronze","s2gate","s2silver","s2gold","s2quar","s2report","s2stale"].forEach(id => $(id).classList.remove("active","bad","done"));
+  $("s2pass").classList.remove("hot"); $("s2fail").classList.remove("badpath");
+  $("s2rawtag").textContent = corrupt ? "2,921 records · 995 poisoned" : "2,900 clean records";
+  $("s2gatetag").textContent = "14 rules";
+  packet.setAttribute("fill", corrupt ? "#ff6b63" : "#3fd0b0");
+  packet.setAttribute("color", corrupt ? "#ff6b63" : "#3fd0b0");
+
+  $("s2raw").classList.add("active");
+  setCap("s2cap", corrupt ? "A poisoned batch arrives: null IDs, “N/A” amounts, lat 181.5, unknown merchants…" : "A clean batch arrives from Firehose.");
+  await sleep(1100);
+  await movePacket(packet, $("s2p1"), 600);
+  $("s2raw").classList.add("done"); $("s2bronze").classList.add("active");
+  setCap("s2cap", "The bronze job <b>succeeds either way</b> — isolating bad data is its job, not a failure.");
+  await sleep(1400);
+  if (corrupt) {
+    const pq = $("s2pq"); await movePacket(packet, pq, 500);
+    $("s2quar").classList.add("bad");
+    $("s2quartag").textContent = "849 rows + reasons";
+    setCap("s2cap", "Malformed records land in <b>quarantine/</b>, each tagged with every rule it broke.");
+    await sleep(1500);
+    packet.setAttribute("cx", 275); packet.setAttribute("cy", 156);
+  }
+  await movePacket(packet, $("s2p2"), 600);
+  $("s2bronze").classList.add("done"); $("s2gate").classList.add("active");
+  setCap("s2cap", "The gate evaluates uniqueness, ranges, referential integrity, freshness…");
+  await sleep(1600);
+  if (!corrupt) {
+    $("s2gatetag").textContent = "14/14 PASS ✓";
+    $("s2pass").classList.add("hot");
+    await movePacket(packet, $("s2pass"), 700);
+    $("s2gate").classList.add("done"); $("s2silver").classList.add("active");
+    await sleep(900); await movePacket(packet, $("s2pg"), 500);
+    $("s2silver").classList.add("done"); $("s2gold").classList.add("active");
+    $("s2goldtag").textContent = "fresh ✓";
+    setCap("s2cap", "<b>PASS</b> → silver and gold refresh. The pipeline goes green.");
+    await sleep(1200); $("s2gold").classList.add("done");
+  } else {
+    $("s2gatetag").textContent = "13/14 FAIL ✗";
+    $("s2gate").classList.add("bad");
+    $("s2fail").classList.add("badpath");
+    await movePacket(packet, $("s2fail"), 700);
+    $("s2report").classList.add("bad");
+    setCap("s2cap", "<b>FAIL</b> → a report is written, SNS emails you… and silver/gold are <b>skipped by construction</b>.");
+    await sleep(1600);
+    $("s2stale").classList.add("active"); $("s2goldtag").textContent = "yesterday's data";
+    setCap("s2cap", "Gold still serves <b>yesterday's correct numbers</b>. Stale and alerted beats silently wrong — that's the whole design.");
+    await sleep(1500);
+  }
+  packet.setAttribute("opacity", 0); running.s2 = false;
+}
+
+/* ------------------------------------------------ scene 3: agent loop */
+async function scene3(kind) {
+  if (running.s3) return; running.s3 = true;
+  const svg = $("s3"), packet = $("s3packet");
+  ["s3q","s3route","s3sql","s3pol","s3ops","s3syn","s3ans"].forEach(id => $(id).classList.remove("active","done","bad"));
+  const Q = { sql: "“What's the fraud rate by day?”", pol: "“What does policy say about chargebacks?”", ops: "“Did last night's pipeline run?”" };
+  const TOOL = { sql: ["s3sql","s3psql", "query_lakehouse: Haiku writes SQL → the <b>validator proves it's a safe SELECT</b> → Athena runs it on gold (7 KB scanned)."],
+                 pol: ["s3pol","s3ppol", "search_policies: the Knowledge Base retrieves passages from S3 Vectors — <b>with source citations</b>."],
+                 ops: ["s3ops","s3pops", "pipeline_status: reads real Step Functions history — the answer is the system's actual state, not a guess."] };
+  packet.setAttribute("cx", 75); packet.setAttribute("cy", 166);
+  $("s3q").classList.add("active");
+  setCap("s3cap", `You ask: <b>${Q[kind]}</b>`); await sleep(1100);
+  await movePacket(packet, $("s3p1"), 500);
+  $("s3q").classList.add("done"); $("s3route").classList.add("active");
+  setCap("s3cap", "<b>route_query</b> (Claude Haiku — small, cheap, fast) picks exactly one tool. Cap check happens <b>before</b> any model call.");
+  await sleep(1500);
+  const [toolId, pathId, toolCap] = TOOL[kind];
+  await movePacket(packet, $(pathId), 650);
+  $("s3route").classList.add("done"); $(toolId).classList.add("active");
+  setCap("s3cap", toolCap); await sleep(1900);
+  $("s3itertxt").setAttribute("fill", "#3fd0b0");
+  setCap("s3cap", "Result goes back to the router — <b>need another tool?</b> No. (If it looped, iteration 5 forces an answer. In code, not hope.)");
+  await sleep(1600); $("s3itertxt").setAttribute("fill", "#8b93a1");
+  const pd = { sql:"M 620 80 C 700 80 710 120 745 148", pol:"M 620 166 H 745", ops:"M 620 252 C 700 252 710 212 745 184" }[kind];
+  const p = mkpath(pd, svg); await movePacket(packet, p, 600); p.remove();
+  $(toolId).classList.add("done"); $("s3syn").classList.add("active");
+  setCap("s3cap", "<b>synthesize</b> (Claude Sonnet — the one place the big model earns its cost) writes the answer from the evidence.");
+  await sleep(1500);
+  await movePacket(packet, $("s3p3"), 400);
+  $("s3syn").classList.add("done"); $("s3ans").classList.add("active");
+  setCap("s3cap", "Answer delivered — <b>with the SQL or citations attached</b>, so it can always be checked. ~12s, ~1,500 tokens, a fifth of a cent.");
+  packet.setAttribute("opacity", 0); running.s3 = false;
+}
+
+/* ------------------------------------------------ scene 4: ensemble */
+async function scene4(fraud) {
+  if (running.s4) return; running.s4 = true;
+  for (let i=0;i<6;i++){ $("s4m"+i).classList.remove("active","done"); $("s4v"+i).setAttribute("opacity",0); }
+  ["s4x","s4avg","s4out"].forEach(id=>$(id).classList.remove("active","done","bad"));
+  $("s4score").textContent = "—"; $("s4verdict").textContent = "";
+  const vals = fraud ? [0.94, 0.91, 0.88, 0.83, 0.71, 0.77] : [0.04, 0.06, 0.05, 0.09, 0.12, 0.08];
+  $("s4x").classList.add("active");
+  setCap("s4cap", fraud
+    ? "This transaction: <b>6th purchase in 9 minutes</b>, amount 11× the customer's norm, new device, jewelry merchant…"
+    : "This transaction: $38 at the customer's usual grocery store, usual device, usual city.");
+  await sleep(1600);
+  for (let i=0;i<6;i++) {
+    $("s4m"+i).classList.add("active");
+    const v = $("s4v"+i); v.textContent = vals[i].toFixed(2); v.setAttribute("opacity",1);
+    await sleep(420);
+  }
+  setCap("s4cap", "Four supervised probabilities + two label-free anomaly scores. Different learners, different blind spots.");
+  await sleep(1400);
+  $("s4avg").classList.add("active");
+  const mean = vals.reduce((a,b)=>a+b,0)/6;
+  await sleep(700);
+  $("s4out").classList.add(fraud ? "bad" : "active");
+  $("s4score").textContent = mean.toFixed(2);
+  $("s4score").setAttribute("fill", fraud ? "#ff6b63" : "#3fd0b0");
+  $("s4verdict").textContent = fraud ? `≥ threshold → predicted_is_fraud = TRUE` : `< threshold → predicted_is_fraud = FALSE`;
+  setCap("s4cap", fraud
+    ? "Ensemble score <b>" + mean.toFixed(2) + "</b> — flagged. Written to gold.transaction_risk_scores, where the agent (and you) can query it."
+    : "Ensemble score <b>" + mean.toFixed(2) + "</b> — clean. Every transaction gets a score; the threshold was chosen on training data only.");
+  running.s4 = false;
+}
+
+/* ------------------------------------------------ scene 5: pricing sort */
+const S5 = [
+  ["S3 + Iceberg",0],["Athena",0],["Glue jobs",0],["Step Functions",0],["Lambda",0],
+  ["Bedrock models",0],["S3 Vectors",0],["Kinesis on-demand",1],["Fargate tasks",1],
+  ["ECS service (count 0)",1],["Hourly schedule (off)",1],["ALB",2],["NAT gateway",2],
+  ["EKS control plane",2],["OpenSearch Serverless",2],
+];
+async function scene5() {
+  if (running.s5) return; running.s5 = true;
+  const cols = [$("s5col0"),$("s5col1"),$("s5col2")];
+  cols.forEach(c => c.innerHTML = "");
+  const colors = ["#69db7c","#ffb454","#ff6b63"];
+  const xs = [40, 360, 680], counts = [0,0,0];
+  for (const [name, col] of S5) {
+    const g = document.createElementNS("http://www.w3.org/2000/svg","g");
+    const y = 66 + counts[col] * 34; counts[col]++;
+    g.innerHTML = `<rect x="${xs[col]}" y="${y}" width="240" height="26" rx="7" fill="#1d232d" stroke="${colors[col]}" stroke-width="1.4" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.3s" fill="freeze"/></rect>
+      <text x="${xs[col]+12}" y="${y+18}" font-size="13" fill="#e8e6e0">${name}</text>`;
+    cols[col].appendChild(g);
+    setCap("s5cap", `<b>${name}</b> → ${["per-request: costs nothing until used","scales to zero: free while idle if configured right","hourly floor: bills from the moment it exists"][col]}`);
+    await sleep(420);
+  }
+  setCap("s5cap", "The red column is why our tfvars default everything off, EKS lives in a same-day workspace, and there is <b>no NAT gateway anywhere</b>. Two weeks of building: ≈ $3.");
+  running.s5 = false;
+}
+</script>
+</body>
+</html>
