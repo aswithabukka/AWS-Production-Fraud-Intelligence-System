@@ -86,3 +86,9 @@ variable "force_destroy_buckets" {
   type    = bool
   default = true
 }
+
+variable "lake_formation_admin_arn" {
+  description = "Principal registered as the Lake Formation data lake administrator. Required to create grants."
+  type        = string
+  default     = ""
+}

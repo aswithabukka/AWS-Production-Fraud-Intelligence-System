@@ -1,5 +1,9 @@
 data "aws_caller_identity" "current" {}
 
+data "aws_iam_session_context" "current" {
+  arn = data.aws_caller_identity.current.arn
+}
+
 locals {
   account_id = data.aws_caller_identity.current.account_id
 
@@ -188,6 +192,10 @@ module "ecs" {
 
 module "governance" {
   source = "../../modules/governance"
+
+  # The identity running terraform becomes the LF data lake administrator —
+  # session context resolves an assumed-role session back to the role ARN.
+  lake_formation_admin_arn = data.aws_iam_session_context.current.issuer_arn
 
   name_prefix     = var.name_prefix
   region          = var.region

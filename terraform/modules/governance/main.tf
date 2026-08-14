@@ -9,6 +9,27 @@
 
 # ------------------------------------------------------------------ Lake Formation
 
+# Being an IAM administrator is NOT sufficient to manage Lake Formation grants — the
+# caller must be registered as a data lake administrator first. The create-default
+# blocks explicitly preserve AWS's out-of-the-box behavior (IAMAllowedPrincipals gets
+# ALL on new databases/tables) so enabling governance cannot silently break the Glue
+# jobs' table management.
+resource "aws_lakeformation_data_lake_settings" "main" {
+  count = var.enable_lake_formation ? 1 : 0
+
+  admins = [var.lake_formation_admin_arn]
+
+  create_database_default_permissions {
+    permissions = ["ALL"]
+    principal   = "IAM_ALLOWED_PRINCIPALS"
+  }
+
+  create_table_default_permissions {
+    permissions = ["ALL"]
+    principal   = "IAM_ALLOWED_PRINCIPALS"
+  }
+}
+
 # Registering the location hands governance of this S3 prefix to Lake Formation. From
 # this point, IAM alone is no longer sufficient to read it — Lake Formation grants are
 # also required, which is exactly the point of the control.
@@ -114,7 +135,8 @@ resource "aws_iam_role_policy" "risk_analyst" {
 # the part that matters — the exclusion survives `SELECT *`. A control that depends on
 # the analyst not asking for a column is not a control.
 resource "aws_lakeformation_permissions" "analyst_metrics" {
-  count = var.enable_lake_formation ? 1 : 0
+  count      = var.enable_lake_formation ? 1 : 0
+  depends_on = [aws_lakeformation_data_lake_settings.main]
 
   principal   = aws_iam_role.analyst[0].arn
   permissions = ["SELECT"]
@@ -129,7 +151,8 @@ resource "aws_lakeformation_permissions" "analyst_metrics" {
 }
 
 resource "aws_lakeformation_permissions" "analyst_merchant_risk" {
-  count = var.enable_lake_formation ? 1 : 0
+  count      = var.enable_lake_formation ? 1 : 0
+  depends_on = [aws_lakeformation_data_lake_settings.main]
 
   principal   = aws_iam_role.analyst[0].arn
   permissions = ["SELECT"]
@@ -144,7 +167,8 @@ resource "aws_lakeformation_permissions" "analyst_merchant_risk" {
 
 # risk_analyst: whole database, all columns. The investigative role.
 resource "aws_lakeformation_permissions" "risk_analyst_database" {
-  count = var.enable_lake_formation ? 1 : 0
+  count      = var.enable_lake_formation ? 1 : 0
+  depends_on = [aws_lakeformation_data_lake_settings.main]
 
   principal   = aws_iam_role.risk_analyst[0].arn
   permissions = ["SELECT", "DESCRIBE"]
