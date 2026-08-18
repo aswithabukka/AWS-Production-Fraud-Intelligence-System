@@ -101,8 +101,47 @@ Everything above — ~29,000 events streamed, 15+ pipeline runs, two days of ite
 the agent layer, all three scenarios — ran on **roughly $2–3 of gross usage**, absorbed
 by credits. Steady state with the stream down remains ~$0.35/month.
 
-## Still open (optional)
+## Slice 3 finale, as run (2026-08-17 evening): Fargate + the EKS demo
 
-- Docker → ECR → Fargate deploy (blocked on installing Docker Desktop locally)
-- EKS same-day demo (`terraform/envs/eks-demo`, ~$0.14/hr while up)
-- Push the repo to GitHub (no remote configured yet) to light up the Actions pipeline
+One evening took the containers row from "code complete" to deployed-and-demoed in both
+runtimes. Nine distinct bugs stood between `docker build` and the HPA scale-out — every
+one diagnosed from evidence, fixed at the source, and committed:
+
+1. **`apt` "Hash Sum mismatch"** killed the image build — a transparent proxy corrupting
+   HTTP package downloads. Fix: HTTPS mirrors in the Dockerfile.
+2. **`ml/` never copied into the image** — `/score` imports `ml.ensemble`, so the
+   container would have crashed on its first scoring call. Found before it shipped.
+3. **`make demo-up` was a silent no-op**: the ECS service sets
+   `lifecycle.ignore_changes = [desired_count]` (so deploys don't fight demos), which
+   also means a `terraform -var` count change does nothing. Scaling now goes through the
+   ECS API, where it belongs.
+4. **The task security group had no ingress at all** when the ALB is disabled — the
+   "allow my IP" rule only existed on the ALB path. Added the direct-to-task variant,
+   still CIDR-restricted, never 0.0.0.0/0.
+5. **Fargate was running `python:3.12-slim`, not the app**: the task definition's
+   placeholder image from the bootstrap apply. Symptom: a task every ~90 s, alive ~25 s,
+   exit 0, zero log lines — because bare Python with no stdin does exactly that. The
+   image now defaults to the stack's own ECR repo.
+6. **EKS nodes failed to join their own cluster**: the API endpoint was public-but-
+   IP-restricted with private access off, so kubectl (from the allowed IP) worked while
+   the worker nodes were locked out. `endpoint_private_access = true`.
+7. **Pod Identity rejected the agent role** — its trust policy named only
+   `ecs-tasks.amazonaws.com`. Added `pods.eks.amazonaws.com` with `sts:TagSession`, so
+   one role serves the workload in both runtimes.
+8. **`imagePullPolicy: IfNotPresent` + `:latest`** pinned each node to whatever it
+   pulled first; rollout restarts silently redeployed the stale image. `Always`.
+9. **`libgomp.so.1` missing** — LightGBM and XGBoost link against OpenMP, which slim
+   images don't carry, and its absence only surfaces on the first `/score` call in the
+   container. One `apt-get install libgomp1` in the runtime stage.
+
+### The numbers
+
+- Fargate: 1 task (0.25 vCPU ARM), `/health` green, ops console served publicly,
+  IP-restricted; ~$0.01/hr while up, $0 at rest.
+- EKS: control plane ACTIVE in ~10 min; 2× t4g.small Graviton nodes joined in 1m46s
+  after the endpoint fix; both pods Ready in 30 s.
+- `/score` on Kubernetes: **0.66 → FRAUD in 78 ms**, all six models voting, models
+  loaded from S3 through Pod Identity (no keys anywhere).
+- HPA demo: 3 load generators → CPU 452–538% of the 60% target →
+  `SuccessfulRescale: New size: 3` then `New size: 4` — min to max in under 4 minutes.
+- Cost of the entire EKS demo window: **≈ $0.30**, cluster destroyed the same evening.

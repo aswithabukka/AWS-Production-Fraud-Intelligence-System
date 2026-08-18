@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="330" viewBox="0 0 880 330" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="13">
+  <rect width="880" height="330" rx="10" fill="#0d1117" stroke="#30363d"/>
+  <circle cx="24" cy="22" r="6" fill="#f85149"/><circle cx="44" cy="22" r="6" fill="#d29922"/><circle cx="64" cy="22" r="6" fill="#3fb950"/>
+  <text x="440" y="27" text-anchor="middle" fill="#8b949e" font-size="12">EKS demo — HPA scale-out under load (captured output)</text>
+  <g fill="#c9d1d9">
+    <text x="24" y="62"><tspan fill="#3fb950">$</tspan> kubectl -n fraud-lake get hpa</text>
+    <text x="24" y="86" fill="#8b949e">NAME             REFERENCE                   TARGETS         MIN  MAX  REPLICAS</text>
+    <text x="24" y="106">fraud-lake-api   Deployment/fraud-lake-api   <tspan fill="#f85149">cpu: 452%/60%</tspan>   2    4    <tspan fill="#3fb950">4</tspan></text>
+    <text x="24" y="146"><tspan fill="#3fb950">$</tspan> kubectl -n fraud-lake describe hpa fraud-lake-api</text>
+    <text x="24" y="170" fill="#8b949e">Events:</text>
+    <text x="24" y="190" fill="#8b949e">  Type    Reason             Age     Message</text>
+    <text x="24" y="210" fill="#8b949e">  ----    ------             ---     -------</text>
+    <text x="24" y="230">  <tspan fill="#3fb950">Normal</tspan>  SuccessfulRescale  5m30s   New size: <tspan fill="#d29922">3</tspan>; reason: cpu resource</text>
+    <text x="24" y="248">                                     utilization (percentage of request) above target</text>
+    <text x="24" y="272">  <tspan fill="#3fb950">Normal</tspan>  SuccessfulRescale  3m45s   New size: <tspan fill="#d29922">4</tspan>; reason: cpu resource</text>
+    <text x="24" y="290">                                     utilization (percentage of request) above target</text>
+  </g>
+  <text x="24" y="316" fill="#8b949e" font-size="11">3 load generators posting /score in a loop → CPU 538% of target → HPA walks 2 → 3 → 4 replicas</text>
+</svg>

@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="360" viewBox="0 0 880 360" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="13">
+  <rect width="880" height="360" rx="10" fill="#0d1117" stroke="#30363d"/>
+  <circle cx="24" cy="22" r="6" fill="#f85149"/><circle cx="44" cy="22" r="6" fill="#d29922"/><circle cx="64" cy="22" r="6" fill="#3fb950"/>
+  <text x="440" y="27" text-anchor="middle" fill="#8b949e" font-size="12">EKS demo — the deployed stack at max scale (captured output)</text>
+  <g fill="#c9d1d9">
+    <text x="24" y="62"><tspan fill="#3fb950">$</tspan> kubectl -n fraud-lake get pods,svc,hpa</text>
+    <text x="24" y="86" fill="#8b949e">NAME                                 READY   STATUS    RESTARTS   AGE</text>
+    <text x="24" y="106">pod/fraud-lake-api-f99bf5dbc-hnssd   <tspan fill="#3fb950">1/1     Running</tspan>   0          6m09s</text>
+    <text x="24" y="124">pod/fraud-lake-api-f99bf5dbc-hr768   <tspan fill="#3fb950">1/1     Running</tspan>   0          3m44s</text>
+    <text x="24" y="142">pod/fraud-lake-api-f99bf5dbc-llrcq   <tspan fill="#3fb950">1/1     Running</tspan>   0          5m29s</text>
+    <text x="24" y="160">pod/fraud-lake-api-f99bf5dbc-sddql   <tspan fill="#3fb950">1/1     Running</tspan>   0          6m25s</text>
+    <text x="24" y="188" fill="#8b949e">NAME                     TYPE        CLUSTER-IP      PORT(S)</text>
+    <text x="24" y="208">service/fraud-lake-api   ClusterIP   172.20.192.66   80/TCP</text>
+    <text x="24" y="240"><tspan fill="#3fb950">$</tspan> kubectl top pods -n fraud-lake</text>
+    <text x="24" y="264" fill="#8b949e">NAME                             CPU(cores)   MEMORY(bytes)</text>
+    <text x="24" y="284">fraud-lake-api-f99bf5dbc-hnssd   <tspan fill="#d29922">458m</tspan>         394Mi</text>
+    <text x="24" y="302">fraud-lake-api-f99bf5dbc-hr768   <tspan fill="#d29922">406m</tspan>         393Mi</text>
+    <text x="24" y="320">fraud-lake-api-f99bf5dbc-llrcq   <tspan fill="#d29922">446m</tspan>         404Mi</text>
+    <text x="24" y="338">fraud-lake-api-f99bf5dbc-sddql   <tspan fill="#d29922">438m</tspan>         247Mi</text>
+  </g>
+</svg>

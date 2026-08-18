@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="390" viewBox="0 0 880 390" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="13">
+  <rect width="880" height="390" rx="10" fill="#0d1117" stroke="#30363d"/>
+  <circle cx="24" cy="22" r="6" fill="#f85149"/><circle cx="44" cy="22" r="6" fill="#d29922"/><circle cx="64" cy="22" r="6" fill="#3fb950"/>
+  <text x="440" y="27" text-anchor="middle" fill="#8b949e" font-size="12">POST /score — six-model ensemble, live on Kubernetes (captured response)</text>
+  <g fill="#c9d1d9">
+    <text x="24" y="62"><tspan fill="#3fb950">$</tspan> curl -X POST http://fraud-lake-api/score -d '{"amount": 4800, "channel": "ecommerce",</text>
+    <text x="46" y="80">"device_change_flag": true, "amount_zscore_30d": 6.0, "txn_count_1h": 7}'</text>
+    <text x="24" y="110">{</text>
+    <text x="42" y="130"><tspan fill="#58a6ff">"ensemble_fraud_score"</tspan>: <tspan fill="#f85149">0.663941</tspan>,</text>
+    <text x="42" y="150"><tspan fill="#58a6ff">"predicted_is_fraud"</tspan>: <tspan fill="#f85149">true</tspan>,</text>
+    <text x="42" y="170"><tspan fill="#58a6ff">"decision_threshold"</tspan>: 0.42,</text>
+    <text x="42" y="190"><tspan fill="#58a6ff">"model_scores"</tspan>: {</text>
+    <text x="60" y="210"><tspan fill="#58a6ff">"lightgbm"</tspan>: 0.957,  <tspan fill="#58a6ff">"xgboost"</tspan>: 0.984,  <tspan fill="#58a6ff">"random_forest"</tspan>: 0.267,</text>
+    <text x="60" y="230"><tspan fill="#58a6ff">"svm"</tspan>: 0.070,  <tspan fill="#58a6ff">"isolation_forest"</tspan>: 0.706,  <tspan fill="#58a6ff">"autoencoder"</tspan>: 1.0</text>
+    <text x="42" y="250">},</text>
+    <text x="42" y="270"><tspan fill="#58a6ff">"top_risk_factors"</tspan>: [<tspan fill="#d29922">"amount_sum_1h"</tspan>, <tspan fill="#d29922">"amount"</tspan>, <tspan fill="#d29922">"txn_count_1h"</tspan>],</text>
+    <text x="42" y="290"><tspan fill="#58a6ff">"model_run_id"</tspan>: <tspan fill="#d29922">"2026-08-14T20:58:49+00:00"</tspan>,</text>
+    <text x="42" y="310"><tspan fill="#58a6ff">"latency_ms"</tspan>: <tspan fill="#3fb950">78.26</tspan></text>
+    <text x="24" y="330">}</text>
+  </g>
+  <text x="24" y="362" fill="#8b949e" font-size="11">Pod Identity → models loaded from S3 → LightGBM · XGBoost · RF · SVM · iForest · autoencoder vote → 78 ms</text>
+</svg>

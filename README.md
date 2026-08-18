@@ -37,11 +37,34 @@ producer ─▶ Kinesis (on-demand) ─▶ Firehose ─▶ S3 raw/            [s
 | 1c | Orchestration + all 3 failure scenarios | ✅ **deployed & executed** |
 | 2 | Agent layer (LangGraph, MCP, FastAPI) | ✅ **deployed — definition-of-done met** |
 | 3 | Governance (Lake Formation personas, CloudTrail) | ✅ **deployed & demoed** |
-| 3 | Containers (ECR/Fargate) · EKS demo · GitHub CI | ⬜ code complete, awaiting Docker install / demo window |
+| 3 | Containers (ECR/Fargate) · EKS demo · GitHub CI | ✅ **deployed & demoed** |
 
 **Everything above ran against a live AWS account.** The measured results — including
 the seven diagnosed failures before the first green run, and the numbers for every
 failure scenario — are in [docs/as-run-results.md](docs/as-run-results.md).
+
+## Deployed: Fargate day-to-day, Kubernetes on demand
+
+The same ARM64 image runs in both places — ECS Fargate for the $0-at-rest daily
+demo, and a same-day EKS cluster (Graviton nodes, Pod Identity, HPA) torn down after
+capture. All output below is from the live 2026-08-17 demo window.
+
+The six-model ensemble answering over HTTP on Kubernetes — models pulled from S3 via
+Pod Identity, scored in 78 ms:
+
+![POST /score — live ensemble response](docs/img/realtime-score.svg)
+
+Three load generators hammering `/score` push CPU to ~5x the target; the horizontal
+pod autoscaler walks the deployment from 2 replicas to its max of 4:
+
+![HPA scale-out under load](docs/img/eks-hpa-scaleout.svg)
+
+![The stack at max scale](docs/img/eks-stack.svg)
+
+The full deployment story — including the nine distinct bugs diagnosed between "docker
+build" and this scale-out (stale-image pins, a trust policy, a missing OpenMP runtime,
+an API endpoint that locked the worker nodes out of their own control plane) — is in
+[docs/as-run-results.md](docs/as-run-results.md).
 
 ## Try it now, with no AWS account
 
