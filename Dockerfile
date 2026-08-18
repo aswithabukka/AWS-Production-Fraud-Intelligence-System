@@ -12,7 +12,9 @@ ENV PIP_NO_CACHE_DIR=1 \
 
 WORKDIR /build
 
-RUN apt-get update \
+# HTTPS mirrors: transparent proxies corrupt http downloads ("Hash Sum mismatch").
+RUN sed -i 's|http://deb.debian.org|https://deb.debian.org|g' /etc/apt/sources.list.d/debian.sources \
+    && apt-get update \
     && apt-get install -y --no-install-recommends build-essential \
     && rm -rf /var/lib/apt/lists/*
 
@@ -40,6 +42,7 @@ COPY --from=builder --chown=app:app /root/.local /home/app/.local
 
 COPY --chown=app:app agents/ ./agents/
 COPY --chown=app:app api/ ./api/
+COPY --chown=app:app ml/ ./ml/
 COPY --chown=app:app mcp_server/ ./mcp_server/
 
 USER app
