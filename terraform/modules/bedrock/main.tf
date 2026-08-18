@@ -421,6 +421,17 @@ data "aws_iam_policy_document" "agent" {
     resources = [var.lake_bucket_arn]
   }
 
+  # Once the gold tables are LF-governed, having an LF SELECT grant is not enough: the
+  # querying principal must also be allowed to ASK Lake Formation for vended storage
+  # credentials. Without this, Athena's engine silently retries credential vending until
+  # the query times out — a 1-second query becomes a 60-second hang, with no error.
+  statement {
+    sid       = "VendLakeFormationCredentials"
+    effect    = "Allow"
+    actions   = ["lakeformation:GetDataAccess"]
+    resources = ["*"]
+  }
+
   # pipeline_status is read-only observability.
   statement {
     sid    = "ReadPipelineStatus"
