@@ -53,7 +53,9 @@ spec:
         - name: api
           # Replaced by kustomize with the ECR image URI.
           image: fraud-lake/api:latest
-          imagePullPolicy: IfNotPresent
+          # Always: this deployment tracks a mutable :latest tag, so IfNotPresent would
+          # pin each node to whatever it pulled first — rollouts would silently no-op.
+          imagePullPolicy: Always
 
           ports:
             - name: http
