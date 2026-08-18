@@ -248,7 +248,7 @@ resource "aws_ecs_task_definition" "api" {
   container_definitions = jsonencode([
     {
       name      = "api"
-      image     = var.api_image
+      image     = var.api_image != "" ? var.api_image : "${aws_ecr_repository.repo["api"].repository_url}:latest"
       essential = true
 
       portMappings = [{ containerPort = var.container_port, protocol = "tcp" }]

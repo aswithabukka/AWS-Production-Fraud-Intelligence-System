@@ -218,9 +218,12 @@ variable "alert_email" {
 }
 
 variable "api_image" {
-  description = "ECR image URI for the API. Push an image before raising ecs_desired_count."
+  description = <<-EOT
+    Image URI override for the API. Empty means the stack's own ECR repo, tag latest —
+    push an image there before raising ecs_desired_count.
+  EOT
   type        = string
-  default     = "public.ecr.aws/docker/library/python:3.12-slim"
+  default     = ""
 }
 
 variable "allowed_ingress_cidrs" {

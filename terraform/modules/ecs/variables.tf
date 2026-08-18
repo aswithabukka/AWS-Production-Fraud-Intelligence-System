@@ -43,8 +43,12 @@ variable "task_role_arn" {
 }
 
 variable "api_image" {
-  description = "Full ECR image URI. Push an image before setting desired_count above 0."
+  description = <<-EOT
+    Full image URI override. Empty (the default) means the module's own ECR repo,
+    tag latest — push an image there before setting desired_count above 0.
+  EOT
   type        = string
+  default     = ""
 }
 
 variable "container_port" {
