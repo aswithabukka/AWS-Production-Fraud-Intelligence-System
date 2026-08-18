@@ -104,8 +104,8 @@ by credits. Steady state with the stream down remains ~$0.35/month.
 ## Slice 3 finale, as run (2026-08-17 evening): Fargate + the EKS demo
 
 One evening took the containers row from "code complete" to deployed-and-demoed in both
-runtimes. Nine distinct bugs stood between `docker build` and the HPA scale-out — every
-one diagnosed from evidence, fixed at the source, and committed:
+runtimes. Eleven distinct bugs stood between `docker build` and a live, sub-10-second
+agent answer — every one diagnosed from evidence, fixed at the source, and committed:
 
 1. **`apt` "Hash Sum mismatch"** killed the image build — a transparent proxy corrupting
    HTTP package downloads. Fix: HTTPS mirrors in the Dockerfile.
@@ -133,6 +133,16 @@ one diagnosed from evidence, fixed at the source, and committed:
 9. **`libgomp.so.1` missing** — LightGBM and XGBoost link against OpenMP, which slim
    images don't carry, and its absence only surfaces on the first `/score` call in the
    container. One `apt-get install libgomp1` in the runtime stage.
+10. **Athena refused to start for the agent role**: "Unable to verify/create output
+    bucket" — object-level S3 grants don't cover the bucket-level `GetBucketLocation`
+    Athena demands on its output bucket. The agent had run only under admin credentials
+    until Fargate put it on its own role for the first time.
+11. **Queries crawled for 60 s and died, only for the agent role** — the sneakiest of
+    the lot. Same SQL: 1.1 s as admin, 1.4 s as the analyst persona, 60+ s then timeout
+    as the agent. The role had its Lake Formation SELECT grants but not
+    `lakeformation:GetDataAccess` — allowed to read the data, not allowed to *pick up
+    the credentials*. Athena's engine silently retries vending instead of failing.
+    Grants say what you may read; `GetDataAccess` is the key pickup window.
 
 ### The numbers
 
@@ -144,4 +154,8 @@ one diagnosed from evidence, fixed at the source, and committed:
   loaded from S3 through Pod Identity (no keys anywhere).
 - HPA demo: 3 load generators → CPU 452–538% of the 60% target →
   `SuccessfulRescale: New size: 3` then `New size: 4` — min to max in under 4 minutes.
+- The agent, live on Fargate under its own locked-down role: *"What was the fraud rate
+  over the last week?"* → **3.6% (861 of 23,926 transactions), answered in 9.4 s /
+  1,178 tokens**, SQL shown with the answer. Policy question answered from the
+  knowledge base with citations (POL-CB-001 § 3) in the same session.
 - Cost of the entire EKS demo window: **≈ $0.30**, cluster destroyed the same evening.

@@ -61,10 +61,15 @@ pod autoscaler walks the deployment from 2 replicas to its max of 4:
 
 ![The stack at max scale](docs/img/eks-stack.svg)
 
-The full deployment story — including the nine distinct bugs diagnosed between "docker
-build" and this scale-out (stale-image pins, a trust policy, a missing OpenMP runtime,
-an API endpoint that locked the worker nodes out of their own control plane) — is in
-[docs/as-run-results.md](docs/as-run-results.md).
+And the agent itself, live on Fargate under its own least-privilege role: *"What was
+the fraud rate over the last week?"* → **3.6% (861 of 23,926 transactions) in 9.4
+seconds**, with the SQL that produced it shown beside the answer.
+
+The full deployment story — including the eleven distinct bugs diagnosed between
+"docker build" and that answer (stale-image pins, a trust policy, a missing OpenMP
+runtime, an API endpoint that locked the worker nodes out of their own control plane,
+and a Lake Formation permission whose absence turns 1-second queries into 60-second
+hangs) — is in [docs/as-run-results.md](docs/as-run-results.md).
 
 ## Try it now, with no AWS account
 
