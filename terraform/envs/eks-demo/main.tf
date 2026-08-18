@@ -101,9 +101,12 @@ resource "aws_eks_cluster" "demo" {
   version  = var.kubernetes_version
 
   vpc_config {
-    subnet_ids              = module.network.public_subnet_ids
-    endpoint_public_access  = true
-    endpoint_private_access = false
+    subnet_ids             = module.network.public_subnet_ids
+    endpoint_public_access = true
+    # Private access ON is what lets the worker nodes reach the API server: with the
+    # public endpoint restricted to allowed_api_cidrs (your IP), nodes would otherwise
+    # be locked out of their own control plane and fail to join.
+    endpoint_private_access = true
     public_access_cidrs     = var.allowed_api_cidrs
   }
 
