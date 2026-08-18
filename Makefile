@@ -78,11 +78,16 @@ stream-down: ## Destroy just Kinesis + Firehose; the lake stays queryable
 stream-up: ## Recreate Kinesis + Firehose for a demo session
 	$(TF) apply -var 'enable_stream=true'
 
+# Scaling goes through the ECS API, not terraform: the service has
+# lifecycle.ignore_changes on desired_count (so deploys don't fight demos), which makes
+# a terraform -var change a silent no-op. Learned the hard way.
 demo-up: ## Bring up one Fargate task for a demo (requires enable_containers)
-	$(TF) apply -var 'ecs_desired_count=1'
+	aws ecs update-service --cluster fraud-lake-cluster --service fraud-lake-api \
+		--desired-count 1 --profile $(AWS_PROFILE) --query 'service.desiredCount'
 
 demo-down: ## Scale the Fargate service back to zero
-	$(TF) apply -var 'ecs_desired_count=0'
+	aws ecs update-service --cluster fraud-lake-cluster --service fraud-lake-api \
+		--desired-count 0 --profile $(AWS_PROFILE) --query 'service.desiredCount'
 
 cost: ## Month-to-date spend for this project, grouped by service
 	@aws ce get-cost-and-usage \
