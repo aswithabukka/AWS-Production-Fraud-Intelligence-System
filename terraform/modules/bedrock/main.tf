@@ -400,10 +400,25 @@ data "aws_iam_policy_document" "agent" {
   }
 
   statement {
-    sid       = "WriteAthenaResults"
-    effect    = "Allow"
-    actions   = ["s3:PutObject", "s3:GetObject"]
+    sid    = "WriteAthenaResults"
+    effect = "Allow"
+    actions = [
+      "s3:PutObject",
+      "s3:GetObject",
+      "s3:AbortMultipartUpload",
+      "s3:ListMultipartUploadParts",
+    ]
     resources = ["${var.lake_bucket_arn}/athena-results/*"]
+  }
+
+  # Athena refuses to run at all without bucket-level GetBucketLocation on the output
+  # bucket — "Unable to verify/create output bucket". Same lesson Lake Formation taught:
+  # bucket-level metadata actions can't ride along on object-level grants.
+  statement {
+    sid       = "LocateAthenaOutputBucket"
+    effect    = "Allow"
+    actions   = ["s3:GetBucketLocation"]
+    resources = [var.lake_bucket_arn]
   }
 
   # pipeline_status is read-only observability.
