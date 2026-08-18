@@ -49,10 +49,30 @@ The same ARM64 image runs in both places — ECS Fargate for the $0-at-rest dail
 demo, and a same-day EKS cluster (Graviton nodes, Pod Identity, HPA) torn down after
 capture. All output below is from the live 2026-08-17 demo window.
 
+The ops console live on Fargate, answering all three question types under the agent's
+own least-privilege role. Data — the fraud rate, with the SQL that produced it, in
+9.4 seconds:
+
+![Console answering the fraud-rate question live](docs/img/console-fraud-rate.png)
+
+Policy — answered from the Bedrock knowledge base with document citations:
+
+![Console answering a policy question with citations](docs/img/console-policy-answer.png)
+
+Ops — pipeline health from Step Functions execution history, including an honest flag
+that the lake is stale because the stream is parked:
+
+![Console reporting pipeline status](docs/img/console-pipeline-status.png)
+
 The six-model ensemble answering over HTTP on Kubernetes — models pulled from S3 via
 Pod Identity, scored in 78 ms:
 
 ![POST /score — live ensemble response](docs/img/realtime-score.svg)
+
+The demo cluster itself — Active, zero health issues, destroyed the same evening it
+was created:
+
+![EKS console: fraud-lake-demo cluster](docs/img/eks-cluster-console.png)
 
 Three load generators hammering `/score` push CPU to ~5x the target; the horizontal
 pod autoscaler walks the deployment from 2 replicas to its max of 4:
