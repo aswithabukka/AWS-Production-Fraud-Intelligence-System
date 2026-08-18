@@ -97,8 +97,12 @@ cost: ## Month-to-date spend for this project, grouped by service
 		--filter '{"Tags":{"Key":"Project","Values":["fraud-lake"]}}' \
 		--profile $(AWS_PROFILE) --output table
 
+# The var is pulled from the dev stack so destroy never prompts for it — an
+# interactive variable prompt right before the yes/no confirm is how a "yes" ends up
+# parsed as an ARN.
 eks-destroy: ## Tear down the EKS demo workspace — RUN THE SAME DAY YOU APPLIED IT
-	terraform -chdir=terraform/envs/eks-demo destroy
+	terraform -chdir=terraform/envs/eks-demo destroy \
+		-var "agent_role_arn=$$(terraform -chdir=terraform/envs/dev output -raw agent_role_arn)"
 
 # ---------------------------------------------------------------- data
 
