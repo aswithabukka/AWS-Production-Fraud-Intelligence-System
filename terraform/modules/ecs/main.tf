@@ -133,6 +133,20 @@ resource "aws_security_group" "task" {
     }
   }
 
+  # Without an ALB, demo traffic hits the task's public IP directly — still restricted
+  # to the allowed CIDRs (your own IP), never 0.0.0.0/0.
+  dynamic "ingress" {
+    for_each = var.enable_alb ? [] : [1]
+
+    content {
+      description = "Application port, direct to the task, allowed CIDRs only"
+      from_port   = var.container_port
+      to_port     = var.container_port
+      protocol    = "tcp"
+      cidr_blocks = var.allowed_ingress_cidrs
+    }
+  }
+
   # Egress to AWS APIs — either via the internet gateway (public_tasks mode) or via the
   # interface endpoints (endpoints mode). Both are HTTPS.
   egress {
