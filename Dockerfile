@@ -26,6 +26,13 @@ RUN pip install --user -r requirements.txt
 # ---------------------------------------------------------------------- runtime
 FROM python:3.12-slim AS runtime
 
+# libgomp1: the OpenMP runtime LightGBM and XGBoost link against — absent from slim
+# images, and its absence only surfaces on the first /score call.
+RUN sed -i 's|http://deb.debian.org|https://deb.debian.org|g' /etc/apt/sources.list.d/debian.sources \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
+
 # Non-root. A container that never needs to write outside /tmp has no reason to run as
 # root, and ECS/EKS security policies increasingly refuse images that do.
 RUN groupadd --gid 10001 app \
