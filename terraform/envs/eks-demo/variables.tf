@@ -25,9 +25,9 @@ variable "kubernetes_version" {
 }
 
 variable "node_instance_type" {
-  description = "Smallest instance that runs the demo. Do not scale this up."
+  description = "Smallest instance that runs the demo. ARM to match the image. Do not scale this up."
   type        = string
-  default     = "t3.small"
+  default     = "t4g.small"
 }
 
 variable "node_count" {

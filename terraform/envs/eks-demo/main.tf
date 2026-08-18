@@ -127,9 +127,12 @@ resource "aws_eks_node_group" "demo" {
   node_role_arn   = aws_iam_role.node.arn
   subnet_ids      = module.network.public_subnet_ids
 
-  # t3.small x2 — the smallest pair that runs CoreDNS, the CNI, and the demo deployment.
+  # t4g.small x2 — the smallest pair that runs CoreDNS, the CNI, and the demo deployment.
   # One node cannot satisfy the HPA's scale-out, which is part of what the demo shows.
+  # ARM (Graviton) to match the image: it is built natively on an Apple Silicon Mac and
+  # the Fargate task already runs ARM64 — one image, every runtime, no cross-compile.
   instance_types = [var.node_instance_type]
+  ami_type       = "AL2023_ARM_64_STANDARD"
   capacity_type  = "ON_DEMAND"
   disk_size      = 20
 
