@@ -294,6 +294,25 @@ data "aws_iam_policy_document" "agent_assume" {
       values   = [var.account_id]
     }
   }
+
+  # EKS Pod Identity: the demo cluster's pods run as this same role — one identity for
+  # the workload wherever it lands. TagSession is how Pod Identity stamps the session
+  # with cluster/namespace attribution.
+  statement {
+    effect  = "Allow"
+    actions = ["sts:AssumeRole", "sts:TagSession"]
+
+    principals {
+      type        = "Service"
+      identifiers = ["pods.eks.amazonaws.com"]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceAccount"
+      values   = [var.account_id]
+    }
+  }
 }
 
 resource "aws_iam_role" "agent" {
