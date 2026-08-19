@@ -16,6 +16,7 @@ locals {
     "fraud_gold.merchant_risk",
     "fraud_gold.transaction_risk_scores",
     "fraud_gold.model_metrics",
+    "fraud_gold.fraud_value_daily",
   ]
 
   model_arns = [

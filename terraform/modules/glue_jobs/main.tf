@@ -46,6 +46,7 @@ locals {
         "--silver_table"  = var.silver_table
         "--scores_table"  = var.scores_table
         "--metrics_table" = var.metrics_table
+        "--value_table"   = var.value_table
         "--feedback_path" = "s3://${var.lake_bucket_id}/feedback"
         "--models_path"   = "s3://${var.lake_bucket_id}/models"
         # Glue 5 SPARK jobs ship pandas/numpy but NOT scikit-learn (the Python-shell

@@ -1,0 +1,436 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>fraud·lake — dashboards</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>▮</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=VT323&family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600&display=swap" rel="stylesheet">
+<style>
+/* ============================================================================
+   FRAUD·LAKE TEAM DASHBOARDS — same CRT chrome as the console.
+   Series colors are NOT the CRT palette: they are a 6-slot categorical set
+   validated for CVD separation + contrast on this surface (see docs/decisions.md).
+   ========================================================================== */
+:root {
+  --bg:        #0b0a08;
+  --bg-panel:  #16130a;
+  --line:      #2e2718;
+  --line-hot:  #4a3d1f;
+  --amber:     #ffb454;
+  --amber-hi:  #ffd28f;
+  --amber-dim: #9c7c45;
+  --red:       #ff5c57;
+  --green:     #5af78e;
+  --text:      #e8dcc3;
+  --text-dim:  #a89877;
+  --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --display: "VT323", var(--mono);
+  /* validated categorical slots, fixed order — never cycled, never reordered */
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181; --s6: #008300;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--bg); color: var(--text);
+  font-family: var(--mono); font-size: 13px; line-height: 1.5;
+  min-height: 100vh; padding-bottom: 40px;
+}
+body::before {
+  content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 999;
+  background: repeating-linear-gradient(0deg, rgba(0,0,0,.16) 0 1px, transparent 1px 3px);
+}
+header {
+  display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap;
+  padding: 18px 24px 10px; border-bottom: 1px solid var(--line);
+}
+.logo { font-family: var(--display); font-size: 34px; color: var(--amber); text-shadow: 0 0 12px rgba(255,180,84,.45); }
+.logo b { color: var(--amber-hi); }
+.sub { color: var(--text-dim); letter-spacing: .14em; font-size: 11px; text-transform: uppercase; }
+.right { margin-left: auto; font-size: 11px; color: var(--text-dim); }
+.right a { color: var(--amber); text-decoration: none; }
+nav { display: flex; gap: 8px; padding: 12px 24px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+nav button {
+  font-family: var(--mono); font-size: 12px; letter-spacing: .1em;
+  background: var(--bg-panel); color: var(--text-dim);
+  border: 1px solid var(--line); padding: 7px 20px; cursor: pointer; text-transform: uppercase;
+}
+nav button.active { color: var(--amber-hi); border-color: var(--amber-dim); box-shadow: 0 0 10px rgba(255,180,84,.18) inset; }
+nav .spacer { margin-left: auto; display: flex; align-items: center; gap: 10px; color: var(--text-dim); font-size: 11px; }
+nav .spacer button { padding: 5px 12px; text-transform: none; }
+main { padding: 18px 24px; max-width: 1240px; margin: 0 auto; }
+.grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+.panel { background: var(--bg-panel); border: 1px solid var(--line); padding: 14px 16px 12px; }
+.panel.wide { grid-column: 1 / -1; }
+.panel h2 { font-size: 11px; color: var(--amber); letter-spacing: .16em; text-transform: uppercase; margin-bottom: 2px; }
+.panel .note { color: var(--text-dim); font-size: 11px; margin-bottom: 10px; }
+.tiles { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); margin-bottom: 14px; }
+.tile { background: var(--bg-panel); border: 1px solid var(--line); padding: 12px 16px; }
+.tile .k { font-size: 10px; letter-spacing: .14em; color: var(--text-dim); text-transform: uppercase; }
+.tile .v { font-family: var(--display); font-size: 38px; line-height: 1.1; color: var(--amber-hi); }
+.tile .v.good { color: var(--green); } .tile .v.bad { color: var(--red); }
+.tile .d { font-size: 11px; color: var(--text-dim); }
+.legend { display: flex; gap: 14px; flex-wrap: wrap; margin: 6px 0 4px; font-size: 11px; color: var(--text-dim); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { width: 10px; height: 10px; display: inline-block; border-radius: 2px; }
+svg text { font-family: var(--mono); }
+.axis { fill: var(--text-dim); font-size: 10px; }
+.gridline { stroke: var(--line); stroke-width: 1; }
+.tooltip {
+  position: fixed; z-index: 1000; pointer-events: none; display: none;
+  background: #0b0a08ee; border: 1px solid var(--line-hot); padding: 8px 10px;
+  font-size: 11px; color: var(--text); box-shadow: 0 4px 18px rgba(0,0,0,.6);
+}
+.tooltip b { color: var(--amber-hi); }
+table.data { width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 8px; }
+table.data th, table.data td { border: 1px solid var(--line); padding: 4px 8px; text-align: right; color: var(--text); }
+table.data th { color: var(--amber); text-transform: uppercase; font-size: 10px; letter-spacing: .1em; }
+table.data td:first-child, table.data th:first-child { text-align: left; }
+.hidden { display: none; }
+.loading, .error { padding: 40px; text-align: center; color: var(--text-dim); }
+.error { color: var(--red); }
+.stale { border: 1px solid var(--line-hot); background: #1a1408; color: var(--amber); padding: 8px 14px; margin-bottom: 14px; font-size: 12px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">FRAUD<b>·</b>LAKE</div>
+  <div class="sub">Team dashboards</div>
+  <div class="right"><a href="/">← ops console</a></div>
+</header>
+<nav>
+  <button id="tab-ops" class="active">Fraud Ops</button>
+  <button id="tab-model">Model Health</button>
+  <button id="tab-business">Business Value</button>
+  <div class="spacer">
+    <span id="freshness"></span>
+    <button id="toggle-tables">table view</button>
+  </div>
+</nav>
+<main id="main"><div class="loading">querying the gold layer…</div></main>
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+"use strict";
+/* Hand-rolled SVG charts. Rules honored (see docs/decisions.md D-013):
+   one axis per chart; categorical colors fixed to entities, never cycled;
+   legend whenever >= 2 series; values printed in text ink, not series color;
+   hover tooltips on every plot; a table view for accessibility. */
+
+const SERIES = { // fixed entity -> color assignment (validated palette order)
+  lightgbm: "var(--s1)", xgboost: "var(--s2)", random_forest: "var(--s3)",
+  svm: "var(--s4)", isolation_forest: "var(--s5)", autoencoder: "var(--s6)",
+};
+// The ensemble is the composite of the six, not a seventh peer — the palette holds six
+// validated slots and a seventh warm hue cannot pass the separation checks. So the
+// ensemble is encoded by PATTERN, not hue: outlined bar, dashed neutral-ink line.
+const ENSEMBLE = { color: "var(--text)", dash: "7 5", outline: true };
+const styleOf = (name) => name === "ensemble" ? ENSEMBLE : {color: SERIES[name] || "var(--s1)"};
+const CAUGHT = "var(--s3)", MISSED = "var(--s2)"; // value chart entities
+const tooltip = document.getElementById("tooltip");
+let showTables = false;
+
+const fmt = {
+  n: (v) => v == null || Number.isNaN(v) ? "—" : Number(v).toLocaleString("en-US"),
+  usd: (v) => v == null || Number.isNaN(v) ? "—" : "$" + Number(v).toLocaleString("en-US", {maximumFractionDigits: 0}),
+  pct: (v) => v == null || Number.isNaN(v) ? "—" : Number(v).toFixed(2) + "%",
+  day: (d) => String(d).slice(5), // 2026-08-14 -> 08-14
+};
+
+function el(tag, attrs = {}, children = []) {
+  const ns = ["svg","g","path","rect","line","circle","text","polyline"].includes(tag);
+  const node = ns ? document.createElementNS("http://www.w3.org/2000/svg", tag) : document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === "text") node.textContent = v; else node.setAttribute(k, v);
+  }
+  for (const c of children) node.appendChild(c);
+  return node;
+}
+
+function showTip(evt, html) {
+  tooltip.innerHTML = html;
+  tooltip.style.display = "block";
+  const pad = 14, w = tooltip.offsetWidth, h = tooltip.offsetHeight;
+  let x = evt.clientX + pad, y = evt.clientY + pad;
+  if (x + w > innerWidth - 8) x = evt.clientX - w - pad;
+  if (y + h > innerHeight - 8) y = evt.clientY - h - pad;
+  tooltip.style.left = x + "px"; tooltip.style.top = y + "px";
+}
+const hideTip = () => tooltip.style.display = "none";
+
+function scale(domainMin, domainMax, rangeMin, rangeMax) {
+  const d = domainMax - domainMin || 1;
+  return (v) => rangeMin + ((v - domainMin) / d) * (rangeMax - rangeMin);
+}
+
+/* ---- line chart: one or more series over an ordered x -------------------- */
+function lineChart({series, xLabels, yFmt, height = 220, unit = "", zeroBase = true}) {
+  const W = 1120, H = height, m = {t: 14, r: 16, b: 26, l: 52};
+  const all = series.flatMap(s => s.values).filter(v => v != null && !Number.isNaN(v));
+  // A line chart may zoom to the data (unlike bars, whose length IS the value); AUC
+  // differences live in the top 15% and vanish against a forced zero baseline.
+  const dataMin = Math.min(...all);
+  const yMax = Math.max(...all, 0.001), yMin = zeroBase ? Math.min(dataMin, 0) : dataMin - (Math.max(...all) - dataMin) * 0.15;
+  const sx = scale(0, Math.max(xLabels.length - 1, 1), m.l, W - m.r);
+  const sy = scale(yMin, yMax * 1.08, H - m.b, m.t);
+  const svg = el("svg", {viewBox: `0 0 ${W} ${H}`, style: "width:100%;height:auto;display:block"});
+
+  for (let g = 0; g <= 3; g++) { // recessive grid: 4 lines only
+    const y = m.t + (g / 3) * (H - m.t - m.b);
+    svg.appendChild(el("line", {x1: m.l, x2: W - m.r, y1: y, y2: y, class: "gridline"}));
+    const val = yMin + (1 - g / 3) * (yMax * 1.08 - yMin);
+    svg.appendChild(el("text", {x: m.l - 6, y: y + 3, "text-anchor": "end", class: "axis", text: yFmt(val)}));
+  }
+  const step = Math.max(1, Math.ceil(xLabels.length / 10));
+  xLabels.forEach((lab, i) => {
+    if (i % step === 0) svg.appendChild(el("text", {x: sx(i), y: H - 8, "text-anchor": "middle", class: "axis", text: fmt.day(lab)}));
+  });
+
+  for (const s of series) {
+    const pts = s.values.map((v, i) => v == null || Number.isNaN(v) ? null : `${sx(i)},${sy(v)}`).filter(Boolean).join(" ");
+    const line = {points: pts, fill: "none", stroke: s.color, "stroke-width": 2, "stroke-linejoin": "round"};
+    if (s.dash) line["stroke-dasharray"] = s.dash;
+    svg.appendChild(el("polyline", line));
+    s.values.forEach((v, i) => {
+      if (v == null || Number.isNaN(v)) return;
+      // 2px surface ring so overlapping markers stay separable
+      svg.appendChild(el("circle", {cx: sx(i), cy: sy(v), r: 3.5, fill: s.color, stroke: "var(--bg-panel)", "stroke-width": 2}));
+    });
+  }
+  // invisible hover columns — hit target far bigger than the mark
+  xLabels.forEach((lab, i) => {
+    const hit = el("rect", {
+      x: sx(i) - (W - m.l - m.r) / xLabels.length / 2, y: m.t,
+      width: (W - m.l - m.r) / Math.max(xLabels.length, 1), height: H - m.t - m.b,
+      fill: "transparent",
+    });
+    hit.addEventListener("mousemove", (e) => showTip(e,
+      `<b>${lab}</b><br>` + series.map(s =>
+        `<span style="color:${s.color}">●</span> ${s.name}: <b>${yFmt(s.values[i])}${unit}</b>`).join("<br>")));
+    hit.addEventListener("mouseleave", hideTip);
+    svg.appendChild(hit);
+  });
+  return svg;
+}
+
+/* ---- horizontal bars: identity on y, magnitude on x ---------------------- */
+function barChart({rows, yFmt, height}) {
+  const W = 1120, rowH = 30, m = {t: 6, r: 90, b: 6, l: 190};
+  const H = height || rows.length * rowH + m.t + m.b;
+  const max = Math.max(...rows.map(r => r.value), 0.001);
+  const sx = scale(0, max, 0, W - m.l - m.r);
+  const svg = el("svg", {viewBox: `0 0 ${W} ${H}`, style: "width:100%;height:auto;display:block"});
+  rows.forEach((r, i) => {
+    const y = m.t + i * rowH;
+    const w = Math.max(sx(r.value), 1.5);
+    svg.appendChild(el("text", {x: m.l - 8, y: y + 19, "text-anchor": "end", class: "axis", text: r.label}));
+    const barAttrs = r.outline
+      ? {x: m.l, y: y + 6, width: w, height: 16, rx: 3, fill: "none", stroke: r.color, "stroke-width": 1.5, "stroke-dasharray": "5 3"}
+      : {x: m.l, y: y + 6, width: w, height: 16, rx: 3, fill: r.color};
+    const bar = el("rect", barAttrs);
+    bar.addEventListener("mousemove", (e) => showTip(e, `<b>${r.label}</b><br>${yFmt(r.value)}${r.extra ? "<br>" + r.extra : ""}`));
+    bar.addEventListener("mouseleave", hideTip);
+    svg.appendChild(bar);
+    // selective direct label, printed in text ink — never in the series color
+    svg.appendChild(el("text", {x: m.l + w + 8, y: y + 19, class: "axis", fill: "var(--text)", text: yFmt(r.value)}));
+  });
+  return svg;
+}
+
+function legend(entries) {
+  const box = el("div", {class: "legend"});
+  for (const e of entries) {
+    const item = el("span");
+    const swatch = e.outline
+      ? `background:transparent;border:1.5px dashed ${e.color}`
+      : `background:${e.color}`;
+    item.appendChild(el("i", {style: swatch}));
+    item.appendChild(document.createTextNode(e.name));
+    box.appendChild(item);
+  }
+  return box;
+}
+
+function dataTable(headers, rows) {
+  const t = el("table", {class: "data" + (showTables ? "" : " hidden")});
+  t.appendChild(el("tr", {}, headers.map(h => el("th", {text: h}))));
+  for (const r of rows) t.appendChild(el("tr", {}, r.map(c => el("td", {text: c}))));
+  return t;
+}
+
+function tile(k, v, cls = "", d = "") {
+  const t = el("div", {class: "tile"});
+  t.appendChild(el("div", {class: "k", text: k}));
+  t.appendChild(el("div", {class: `v ${cls}`, text: v}));
+  if (d) t.appendChild(el("div", {class: "d", text: d}));
+  return t;
+}
+
+function panel(title, note, ...children) {
+  const p = el("div", {class: "panel wide"});
+  p.appendChild(el("h2", {text: title}));
+  if (note) p.appendChild(el("div", {class: "note", text: note}));
+  for (const c of children) p.appendChild(c);
+  return p;
+}
+
+/* ------------------------------------------------------------------ views */
+
+function renderOps(d, main) {
+  const tiles = el("div", {class: "tiles"});
+  tiles.appendChild(tile("transactions", fmt.n(d.tiles.transactions), "", `${d.tiles.days} days of gold`));
+  tiles.appendChild(tile("fraud caught in data", fmt.n(d.tiles.fraud_transactions)));
+  tiles.appendChild(tile("fraud rate", fmt.pct(d.tiles.fraud_rate_pct), "bad"));
+  tiles.appendChild(tile("fraud exposure", fmt.usd(d.tiles.fraud_loss_usd), "bad"));
+  main.appendChild(tiles);
+
+  const trend = d.fraud_rate_trend;
+  main.appendChild(panel(
+    "Fraud rate by day", "fraud_gold.fraud_metrics_daily — the agent reads this same table",
+    lineChart({
+      series: [{name: "fraud rate", color: "var(--s2)", values: trend.map(r => r.fraud_rate_pct)}],
+      xLabels: trend.map(r => r.dt), yFmt: fmt.pct,
+    }),
+    dataTable(["day", "transactions", "fraud rate"],
+      trend.map(r => [r.dt, fmt.n(r.transactions), fmt.pct(r.fraud_rate_pct)])),
+  ));
+
+  main.appendChild(panel(
+    "Fraud rate by channel", "where fraud concentrates — ranked",
+    barChart({rows: d.by_channel.map(r => ({
+      label: r.channel, value: r.fraud_rate_pct, color: "var(--s2)",
+      extra: `${fmt.n(r.transactions)} transactions`,
+    })), yFmt: fmt.pct}),
+    dataTable(["channel", "transactions", "fraud rate"],
+      d.by_channel.map(r => [r.channel, fmt.n(r.transactions), fmt.pct(r.fraud_rate_pct)])),
+  ));
+
+  main.appendChild(panel(
+    "Fraud loss by merchant category", "top 8 MCCs by dollars lost",
+    barChart({rows: d.loss_by_mcc.map(r => ({
+      label: "MCC " + r.mcc, value: r.fraud_loss_usd, color: "var(--s2)",
+    })), yFmt: fmt.usd}),
+    dataTable(["mcc", "fraud loss"],
+      d.loss_by_mcc.map(r => ["MCC " + r.mcc, fmt.usd(r.fraud_loss_usd)])),
+  ));
+}
+
+function renderModel(d, main) {
+  const tiles = el("div", {class: "tiles"});
+  const best = d.leaderboard[0];
+  tiles.appendChild(tile("training runs", fmt.n(d.training_runs), "", "latest: " + (d.latest_run || "—")));
+  if (best) tiles.appendChild(tile("best model auc", best.roc_auc.toFixed(3), "good", best.model));
+  const fb = d.feedback[d.feedback.length - 1];
+  if (fb) {
+    tiles.appendChild(tile("training rows", fmt.n(fb.training_rows)));
+    tiles.appendChild(tile("labels corrected", fmt.n(fb.labels_changed), fb.labels_changed ? "good" : "", "by analyst feedback, latest run"));
+  }
+  main.appendChild(tiles);
+
+  main.appendChild(panel(
+    "Holdout ROC-AUC — latest run", "fraud_gold.model_metrics · higher is better · threshold-free",
+    barChart({rows: d.leaderboard.map(r => ({
+      label: r.model, value: r.roc_auc, ...styleOf(r.model),
+      extra: `precision ${(r.precision * 100).toFixed(1)}% · recall ${(r.recall * 100).toFixed(1)}%`,
+    })), yFmt: (v) => v.toFixed(3)}),
+    dataTable(["model", "roc-auc", "precision", "recall", "f1"],
+      d.leaderboard.map(r => [r.model, r.roc_auc.toFixed(4), fmt.pct(r.precision * 100), fmt.pct(r.recall * 100), r.f1.toFixed(4)])),
+  ));
+
+  const models = Object.keys(d.auc_trend);
+  const runs = d.feedback.map(f => f.run);
+  if (runs.length >= 2) {
+    main.appendChild(panel(
+      "AUC across training runs", "is retraining helping? one axis, zoomed to the data — the ensemble is the dashed line",
+      legend(models.map(m => ({name: m, ...styleOf(m)}))),
+      lineChart({
+        series: models.map(m => ({
+          name: m, ...styleOf(m),
+          values: runs.map(run => {
+            const hit = d.auc_trend[m].find(p => p.run === run);
+            return hit ? hit.roc_auc : null;
+          }),
+        })),
+        // run ids are ISO timestamps; the date+hour slice is the readable part
+        xLabels: runs.map(r => String(r).slice(5, 16)), yFmt: (v) => v == null ? "—" : v.toFixed(3),
+        zeroBase: false,
+      }),
+    ));
+  }
+
+  main.appendChild(panel(
+    "Feedback loop", "confirmed ground truth folded into each retrain",
+    dataTable(["run", "training rows", "labels confirmed", "labels changed"],
+      d.feedback.map(f => [f.run, fmt.n(f.training_rows), fmt.n(f.labels_confirmed), fmt.n(f.labels_changed)])),
+  ));
+  // the feedback table is the content here, so it ignores the table toggle
+  main.lastChild.querySelector("table").classList.remove("hidden");
+}
+
+function renderBusiness(d, main) {
+  const tiles = el("div", {class: "tiles"});
+  tiles.appendChild(tile("fraud dollars intercepted", fmt.usd(d.tiles.intercepted_usd), "good", "flagged before completion*"));
+  tiles.appendChild(tile("fraud dollars missed", fmt.usd(d.tiles.missed_usd), "bad"));
+  tiles.appendChild(tile("dollar capture rate", fmt.pct(d.tiles.dollar_capture_rate_pct), "good"));
+  tiles.appendChild(tile("flag precision", fmt.pct(d.tiles.flag_precision_pct), "", "of flags, how many were real"));
+  tiles.appendChild(tile("review queue", fmt.n(d.tiles.review_queue), "", "false alarms sent to analysts"));
+  main.appendChild(tiles);
+
+  main.appendChild(panel(
+    "Intercepted vs missed, daily", "fraud_gold.fraud_value_daily — ask the agent \"how much did we save last week?\"",
+    legend([{name: "intercepted", color: CAUGHT}, {name: "missed", color: MISSED}]),
+    lineChart({
+      series: [
+        {name: "intercepted", color: CAUGHT, values: d.daily.map(r => r.caught_usd)},
+        {name: "missed", color: MISSED, values: d.daily.map(r => r.missed_usd)},
+      ],
+      xLabels: d.daily.map(r => r.dt), yFmt: fmt.usd,
+    }),
+    dataTable(["day", "intercepted", "missed", "false alarms", "capture rate"],
+      d.daily.map(r => [r.dt, fmt.usd(r.caught_usd), fmt.usd(r.missed_usd), fmt.n(r.false_alarms), fmt.pct(r.capture_rate_pct)])),
+  ));
+
+  const foot = el("div", {class: "panel wide"});
+  foot.appendChild(el("div", {class: "note",
+    text: "* \"Intercepted\" assumes a flagged fraudulent transaction would otherwise have completed — the standard framing for fraud-prevention value, stated rather than hidden. Source: ensemble decisions vs confirmed labels, priced at transaction amount."}));
+  main.appendChild(foot);
+}
+
+/* ------------------------------------------------------------------ shell */
+
+const TABS = {ops: renderOps, model: renderModel, business: renderBusiness};
+let current = "ops";
+const cache = {};
+
+async function load(tab) {
+  current = tab;
+  for (const t of Object.keys(TABS)) document.getElementById("tab-" + t).classList.toggle("active", t === tab);
+  const main = document.getElementById("main");
+  main.innerHTML = '<div class="loading">querying the gold layer…</div>';
+  try {
+    if (!cache[tab]) {
+      const res = await fetch("/api/dashboards/" + tab);
+      if (!res.ok) throw new Error((await res.json()).detail || res.statusText);
+      cache[tab] = await res.json();
+    }
+    main.innerHTML = "";
+    TABS[tab](cache[tab], main);
+  } catch (err) {
+    main.innerHTML = `<div class="error">${err.message}<br><br>
+      If this mentions a missing table, the ML job has not produced fraud_value_daily yet —
+      run the pipeline (make run-pipeline) or make train, then reload.</div>`;
+  }
+}
+
+for (const t of Object.keys(TABS)) {
+  document.getElementById("tab-" + t).addEventListener("click", () => load(t));
+}
+document.getElementById("toggle-tables").addEventListener("click", () => {
+  showTables = !showTables;
+  document.querySelectorAll("table.data").forEach(t => t.classList.toggle("hidden", !showTables));
+});
+load("ops");
+</script>
+</body>
+</html>

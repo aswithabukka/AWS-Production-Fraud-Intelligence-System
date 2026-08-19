@@ -81,6 +81,11 @@ variable "metrics_table" {
   default = "fraud_gold.model_metrics"
 }
 
+variable "value_table" {
+  type    = string
+  default = "fraud_gold.fraud_value_daily"
+}
+
 # ------------------------------------------------------------------- cost controls
 
 variable "glue_version" {

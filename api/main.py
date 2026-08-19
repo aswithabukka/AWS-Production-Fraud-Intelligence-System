@@ -72,6 +72,7 @@ app = FastAPI(
 
 
 _CONSOLE = Path(__file__).parent / "static" / "index.html"
+_DASHBOARDS = Path(__file__).parent / "static" / "dashboards.html"
 
 
 @app.get("/", include_in_schema=False)
@@ -82,6 +83,48 @@ def console() -> FileResponse:
     port, nothing extra to deploy or keep in sync.
     """
     return FileResponse(_CONSOLE, media_type="text/html")
+
+
+@app.get("/dashboards", include_in_schema=False)
+def dashboards_page() -> FileResponse:
+    """Team dashboards — same single-file pattern as the console."""
+    return FileResponse(_DASHBOARDS, media_type="text/html")
+
+
+@app.get("/api/dashboards/ops")
+def dashboards_ops() -> dict[str, Any]:
+    """Fraud-operations view: volumes, rate trend, where fraud concentrates."""
+    from api import dashboards
+
+    _counters["dashboard_views"] += 1
+    try:
+        return dashboards.ops_dashboard()
+    except Exception as exc:  # noqa: BLE001 - surface the reason, not a bare 500
+        raise HTTPException(status_code=502, detail=f"dashboard query failed: {exc}") from exc
+
+
+@app.get("/api/dashboards/model")
+def dashboards_model() -> dict[str, Any]:
+    """ML-team view: per-model holdout quality across training runs, feedback impact."""
+    from api import dashboards
+
+    _counters["dashboard_views"] += 1
+    try:
+        return dashboards.model_dashboard()
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=502, detail=f"dashboard query failed: {exc}") from exc
+
+
+@app.get("/api/dashboards/business")
+def dashboards_business() -> dict[str, Any]:
+    """Leadership view: dollars intercepted vs missed, review workload."""
+    from api import dashboards
+
+    _counters["dashboard_views"] += 1
+    try:
+        return dashboards.business_dashboard()
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=502, detail=f"dashboard query failed: {exc}") from exc
 
 
 @app.get("/health", response_model=HealthResponse)

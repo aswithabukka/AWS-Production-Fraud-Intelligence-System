@@ -37,6 +37,7 @@ from glue.spark_utils import (
 )
 from ml.ensemble import train_and_score
 from ml.feedback import apply_feedback
+from ml.value import fraud_value_daily
 
 REQUIRED_ARGS = [
     "JOB_NAME",
@@ -44,6 +45,7 @@ REQUIRED_ARGS = [
     "silver_table",
     "scores_table",
     "metrics_table",
+    "value_table",
     "feedback_path",
     "models_path",
 ]
@@ -70,6 +72,7 @@ def main() -> None:
     silver_table = f"{CATALOG}.{args['silver_table']}"
     scores_table = f"{CATALOG}.{args['scores_table']}"
     metrics_table = f"{CATALOG}.{args['metrics_table']}"
+    value_table = f"{CATALOG}.{args['value_table']}"
 
     cutoff = (datetime.now(UTC) - timedelta(days=LOOKBACK_DAYS)).date()
     silver = spark.table(silver_table).filter(F.col("dt") >= F.lit(cutoff))
@@ -151,6 +154,19 @@ def main() -> None:
     # model performance over time is itself a dashboard-worthy series.
     metrics_df.writeTo(metrics_table).append()
     logger.info("appended %s metric rows to %s", len(metrics), metrics_table)
+
+    # ------------------------------------------------------------ value table
+    # The dollars ledger for the business dashboard: confusion-matrix cells priced per
+    # day. MERGE on dt — a retrain re-prices history rather than duplicating it.
+    value = fraud_value_daily(pdf, result.scores)
+    value["model_run_id"] = run_stamp
+    value["computed_at"] = trained_at
+    value_df = spark.createDataFrame(value)
+
+    create_iceberg_table(spark, value_table, value_df, partition_by=None)
+    ensure_table_columns(spark, value_table, value_df)
+    merge_into(spark, value_table, value_df, key_columns=["dt"], temp_view="_value_src")
+    logger.info("merged %s daily value rows into %s", len(value), value_table)
 
     for row in result.metrics.itertuples():
         logger.info(

@@ -170,7 +170,7 @@ resource "aws_lakeformation_permissions" "analyst_merchant_risk" {
 # catalog operations on them are LF-checked for every principal — including the Glue
 # role that rewrites them each run. Explicit ALL keeps the gold job working.
 resource "aws_lakeformation_permissions" "glue_gold" {
-  for_each = var.enable_lake_formation ? toset([var.fraud_metrics_table, var.merchant_risk_table]) : toset([])
+  for_each = var.enable_lake_formation ? toset(concat([var.fraud_metrics_table, var.merchant_risk_table], var.ml_gold_tables)) : toset([])
 
   depends_on  = [aws_lakeformation_data_lake_settings.main]
   principal   = var.glue_role_arn
@@ -184,7 +184,7 @@ resource "aws_lakeformation_permissions" "glue_gold" {
 
 # The agent's task role (used when the API runs on ECS rather than as the admin user).
 resource "aws_lakeformation_permissions" "agent_gold" {
-  for_each = var.enable_lake_formation && var.agent_role_arn != "" ? toset([var.fraud_metrics_table, var.merchant_risk_table]) : toset([])
+  for_each = var.enable_lake_formation && var.agent_role_arn != "" ? toset(concat([var.fraud_metrics_table, var.merchant_risk_table], var.ml_gold_tables)) : toset([])
 
   depends_on  = [aws_lakeformation_data_lake_settings.main]
   principal   = var.agent_role_arn

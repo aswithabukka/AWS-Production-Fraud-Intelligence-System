@@ -108,6 +108,21 @@ curl -s localhost:8000/sql/check -X POST -H 'content-type: application/json' \
 # -> {"status":"rejected","reason":"expected exactly 1 statement, found 2 — stacked statements are rejected"}
 ```
 
+## Team dashboards
+
+`/dashboards` on the same container serves three audiences from the same gold tables
+the agent queries — no BI product, no extra infrastructure, per-request pricing:
+
+- **Fraud Ops** — volumes, fraud-rate trend, fraud by channel and merchant category
+- **Model Health** — per-model holdout AUC/precision/recall across training runs, and
+  what the label-feedback loop changed each retrain
+- **Business Value** — fraud dollars intercepted vs missed and analyst review workload,
+  from `fraud_gold.fraud_value_daily`, a governed table the ML job prices from its own
+  confusion matrix (so the agent can answer "how much did we save?" from the same source)
+
+Charts are hand-rolled SVG with a colorblind-validated palette (checked by script
+against the dark surface, not by eye), hover tooltips, and a table view toggle.
+
 ## Cost posture
 
 Steady state: **~$0.35/month** with the stream down, **under ~$30/month** with everything

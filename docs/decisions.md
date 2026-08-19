@@ -108,3 +108,23 @@ Honesty rule attached to this layer: silver features were engineered to catch ex
 the fraud archetypes the generator injects, so holdout metrics validate the feature
 engineering, not real-world fraud performance. The threshold is chosen on the training
 split only; choosing it on holdout would leak the test set into the decision rule.
+
+## D-013 — Team dashboards served by the API container, not a BI product
+
+Three team dashboards (fraud ops, model health, business value) are hand-built pages
+served by the existing FastAPI container at `/dashboards`, backed by five fixed Athena
+queries with a 5-minute in-process cache.
+
+Why not QuickSight / Managed Grafana: both bill per user per month ($9–24) for what is,
+at this scale, a handful of small Athena scans and some SVG. The hand-built path keeps
+the platform's pricing shape (per-request, $0 at rest), adds zero infrastructure, and
+the charts follow a validated design method — the six model colors pass colorblind-
+separation and contrast checks against the console surface (checked with a script, not
+by eye), the ensemble is encoded by pattern rather than claiming a seventh hue, and
+every chart ships a hover layer plus a table view.
+
+The business numbers come from a new gold table, `fraud_gold.fraud_value_daily`
+(confusion-matrix cells priced per day: caught/missed/false-alarm dollars), written by
+the ML job — deliberately a governed table rather than dashboard-side arithmetic, so
+the SQL agent can answer "how much did we save last week?" from the same source the
+dashboard draws.
